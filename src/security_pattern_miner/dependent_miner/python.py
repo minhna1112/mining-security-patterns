@@ -4,11 +4,13 @@ import requests
 from schemas.libraries_io_request import LibrariesIOGetDependentRequest
 from schemas.libraries_io_response import DependentRepositoryInfo, LibrariesIOGetDependentResponse
 from typing import List
+from config.constants import PYTHON, PYPI
+
 
 class PythonDependentMiner(DependentMiner):
     def get_dependents(self, package_name: str) -> List[DependentRepositoryInfo]:
         request = LibrariesIOGetDependentRequest(
-            package_manager="pypi",
+            package_manager=PYPI,
             package_name=package_name,
             page=1,
             per_page=30
