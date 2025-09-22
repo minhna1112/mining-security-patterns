@@ -9,6 +9,7 @@ from utils.libraries_io import get_libraries_io_url
 from typing import List
 from utils.logger import logger
 import json
+import jsonlines
 logger.setLevel(logging.INFO)
 class DependentMiner(ABC):
     @abstractmethod
@@ -40,6 +41,10 @@ class LibrariesIODependentMiner(DependentMiner):
             dependents.extend(dependents_in_page)
             # Here you would typically make the API call and process the response
             logger.info(f"Fetched {len(dependents_in_page)} dependents from page {num_pages} for package {package_name}")
+            if num_pages == 1:
+                self.save_dependents_to_file(package_name, dependents_in_page)
+            else:
+                self.append_dependents_to_file(package_name, dependents_in_page)
             num_pages += 1
             
         return dependents
@@ -64,3 +69,21 @@ class LibrariesIODependentMiner(DependentMiner):
         else:
             response.raise_for_status()
         # Here you would typically make the API call and process the response
+        
+    def save_dependents_to_file(self, package_name: str, dependents: List[DependentRepositoryInfo]):
+        import os
+        if not os.path.exists(LibrariesIOConfig.dependent_repo_info_save_dir):
+            os.makedirs(LibrariesIOConfig.dependent_repo_info_save_dir)
+        file_path = os.path.join(LibrariesIOConfig.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_{LibrariesIOConfig.start_page}.jsonl")
+        with jsonlines.open(file_path, "w") as f:
+            f.write_all([dep.dict() for dep in dependents])
+        logger.info(f"Saved {len(dependents)} dependents for package {package_name} to {file_path}")
+        
+    def append_dependents_to_file(self, package_name: str, dependents: List[DependentRepositoryInfo]):
+        import os
+        if not os.path.exists(LibrariesIOConfig.dependent_repo_info_save_dir):
+            os.makedirs(LibrariesIOConfig.dependent_repo_info_save_dir)
+        file_path = os.path.join(LibrariesIOConfig.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_{LibrariesIOConfig.start_page}.jsonl")
+        with jsonlines.open(file_path, "a") as f:
+            f.write_all([dep.dict() for dep in dependents])
+        logger.info(f"Appended {len(dependents)} dependents for package {package_name} to {file_path}")
