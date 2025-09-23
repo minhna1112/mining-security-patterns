@@ -160,3 +160,13 @@ class LibrariesIODependentMiner(DependentMiner):
         
         logger.info(f"Found {len(mutual_dependents)} mutual dependents for packages: {', '.join(package_names)}")
         return mutual_dependents
+
+    def save_mutual_dependents(self, package_names: List[str], mutual_dependents: List[DependentRepositoryInfo]):
+        import os
+        if not os.path.exists(LibrariesIOConfig.dependent_repo_info_save_dir):
+            os.makedirs(LibrariesIOConfig.dependent_repo_info_save_dir)
+        package_names_str = "_".join(package_names)
+        file_path = os.path.join(LibrariesIOConfig.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_mutual_dependents_{package_names_str}.jsonl")
+        with jsonlines.open(file_path, "w") as f:
+            f.write_all([dep.dict() for dep in mutual_dependents])
+        logger.info(f"Saved {len(mutual_dependents)} mutual dependents for packages {package_names_str} to {file_path}")
