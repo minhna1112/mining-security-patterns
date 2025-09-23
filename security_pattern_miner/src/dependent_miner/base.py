@@ -127,3 +127,28 @@ class LibrariesIODependentMiner(DependentMiner):
                 unique_dependents[dep['full_name']] = dep
         with jsonlines.open(file_path, "w") as f:
             f.write_all(unique_dependents.values())
+    
+    def load_saved_dependents(self, package_name: str) -> List[DependentRepositoryInfo]:
+        import os
+        if not os.path.exists(LibrariesIOConfig.dependent_repo_info_save_dir):
+            return []
+        file_path = os.path.join(LibrariesIOConfig.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_{LibrariesIOConfig.start_page}.jsonl")
+        if not os.path.exists(file_path):
+            return []
+        dependents = []
+        with jsonlines.open(file_path, "r") as f:
+            for dep in f:
+                dependents.append(DependentRepositoryInfo(**dep))
+        return dependents
+            
+    def find_mutual_dependents(self, package_names: List[str]) -> List[DependentRepositoryInfo]:
+        if len(package_names) < 2:
+            logger.warning("At least two package names are required to find mutual dependents.")
+            return []
+        mutual_dependents = {}
+        for pkg in package_names:
+            dependents = self.load_saved_dependents(pkg)
+            for dep in dependents:
+                if dep.full_name not in mutual_dependents:
+                    mutual_dependents[dep.full_name] = dep
+        return list(mutual_dependents.values())
