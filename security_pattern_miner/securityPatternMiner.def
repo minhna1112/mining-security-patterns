@@ -1,0 +1,15 @@
+Bootstrap: docker
+From: python:3.11.13-slim-trixie
+
+%files
+    ./requirements.txt /security_pattern_miner/requirements.txt
+    ./src /security_pattern_miner/
+
+%post
+    pip install --no-cache-dir -r /security_pattern_miner/requirements.txt
+
+%runscript
+    cd /security_pattern_miner
+    python ./runner.py
+
+%workdir /security_pattern_miner

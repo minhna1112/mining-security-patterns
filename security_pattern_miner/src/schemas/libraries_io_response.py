@@ -1,0 +1,51 @@
+from typing import List, Optional
+from pydantic import BaseModel
+
+class DependentRepositoryInfo(BaseModel):
+    full_name: str
+    description: Optional[str] = None
+    fork: Optional[bool] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    pushed_at: Optional[str] = None
+    homepage: Optional[str] = None
+    size: Optional[int] = None
+    stargazers_count: Optional[int] = None
+    language: Optional[str] = None
+    has_issues: Optional[bool] = None
+    has_wiki: Optional[bool] = None
+    has_pages: Optional[bool] = None
+    forks_count: Optional[int] = None
+    mirror_url: Optional[str] = None
+    open_issues_count: Optional[int] = None
+    default_branch: Optional[str] = None
+    subscribers_count: Optional[int] = None
+    uuid: Optional[str] = None
+    source_name: Optional[str] = None
+    license: Optional[str] = None
+    private: Optional[bool] = None
+    contributions_count: Optional[int] = None
+    has_readme: Optional[str] = None
+    has_changelog: Optional[str] = None
+    has_contributing: Optional[str] = None
+    has_license: Optional[str] = None
+    has_coc: Optional[str] = None
+    has_threat_model: Optional[str] = None
+    has_audit: Optional[str] = None
+    status: Optional[str] = None
+    last_synced_at: Optional[str] = None
+    rank: Optional[int] = None
+    host_type: Optional[str] = None
+    host_domain: Optional[str] = None
+    name: Optional[str] = None
+    scm: Optional[str] = None
+    fork_policy: Optional[str] = None
+    github_id: Optional[str] = None
+    pull_requests_enabled: Optional[bool] = None
+    logo_url: Optional[str] = None
+    github_contributions_count: Optional[int] = None
+    keywords: Optional[List[str]] = None
+    code_of_conduct_url: Optional[str] = None
+    contribution_guidelines_url: Optional[str] = None
+    funding_urls: Optional[List[str]] = None
+    security_policy_url: Optional[str] = None
