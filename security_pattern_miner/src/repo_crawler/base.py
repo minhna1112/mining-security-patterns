@@ -63,7 +63,7 @@ class GitCrawler(RepoCrawler):
     def crawl_from_dependent_repos_info(self, dependent_repos: list[DependentRepositoryInfo]):
         successfully_cloned = 0
         start_index = GitCrawlerConfig.start_index
-        end_index = start_index + GitCrawlerConfig.max_num_repos
+        end_index = GitCrawlerConfig.end_index
         for repo in tqdm(dependent_repos[start_index:end_index], desc="Cloning repositories"):
             cloned_path = self.crawl(repo)
             if cloned_path:
