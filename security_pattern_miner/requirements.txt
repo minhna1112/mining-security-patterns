@@ -2,3 +2,5 @@ pydantic
 requests
 # python-woc
 jsonlines
+tqdm
+GitPython

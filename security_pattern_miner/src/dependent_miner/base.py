@@ -10,6 +10,8 @@ from typing import List
 from utils.logger import logger
 import json
 import jsonlines
+from tqdm import tqdm
+
 logger.setLevel(logging.INFO)
 class DependentMiner(ABC):
     @abstractmethod
@@ -78,6 +80,31 @@ class LibrariesIODependentMiner(DependentMiner):
         with jsonlines.open(file_path, "w") as f:
             f.write_all([dep.dict() for dep in dependents])
         logger.info(f"Saved {len(dependents)} dependents for package {package_name} to {file_path}")
+    
+    def merge_dependents_files(self, package_name: str):
+        """
+        Merge all dependent files for a package into a single file, removing duplicates.
+        This means that all files named like {language}_{package_manager}_{package_name}_dependents_*.jsonl
+        will be merged into one file named {language}_{package_manager}_{package_name}_dependents_1.jsonl
+        """
+        import os
+        import glob
+        if not os.path.exists(LibrariesIOConfig.dependent_repo_info_save_dir):
+            return
+        pattern = os.path.join(LibrariesIOConfig.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_*.jsonl")
+        files = glob.glob(pattern)
+        if not files:
+            return
+        unique_dependents = {}
+        for file in files:
+            with jsonlines.open(file, "r") as f:
+                for dep in f:
+                    unique_dependents[dep['full_name']] = dep
+        merged_file_path = os.path.join(LibrariesIOConfig.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_1.jsonl")
+        with jsonlines.open(merged_file_path, "w") as f:
+            f.write_all(unique_dependents.values())
+        logger.info(f"Merged {len(files)} files into {merged_file_path} with {len(unique_dependents)} unique dependents")
+        
         
     def append_dependents_to_file(self, package_name: str, dependents: List[DependentRepositoryInfo]):
         import os
@@ -87,3 +114,59 @@ class LibrariesIODependentMiner(DependentMiner):
         with jsonlines.open(file_path, "a") as f:
             f.write_all([dep.dict() for dep in dependents])
         logger.info(f"Appended {len(dependents)} dependents for package {package_name} to {file_path}")
+        
+    def clean_saved_dependents(self, package_name: str):
+        # Remove duplicated JSON line (dependent ) in previously saved dependents file if exists
+        import os
+        if not os.path.exists(LibrariesIOConfig.dependent_repo_info_save_dir):
+            return
+        file_path = os.path.join(LibrariesIOConfig.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_{LibrariesIOConfig.start_page}.jsonl")
+        if not os.path.exists(file_path):
+            return
+        unique_dependents = {}
+        with jsonlines.open(file_path, "r") as f:
+            for dep in f:
+                unique_dependents[dep['full_name']] = dep
+        with jsonlines.open(file_path, "w") as f:
+            f.write_all(unique_dependents.values())
+    
+    def load_saved_dependents(self, package_name: str) -> List[DependentRepositoryInfo]:
+        import os
+        if not os.path.exists(LibrariesIOConfig.dependent_repo_info_save_dir):
+            return []
+        file_path = os.path.join(LibrariesIOConfig.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_{LibrariesIOConfig.start_page}.jsonl")
+        if not os.path.exists(file_path):
+            return []
+        dependents = []
+        with jsonlines.open(file_path, "r") as f:
+            for dep in f:
+                dependents.append(DependentRepositoryInfo(**dep))
+        return dependents
+            
+    def find_mutual_dependents(self, package_names: List[str]) -> List[DependentRepositoryInfo]:
+        if len(package_names) < 2:
+            logger.warning("At least two package names are required to find mutual dependents.")
+            return []
+        mutual_dependents = {}
+        for pkg in package_names:
+            dependents = self.load_saved_dependents(pkg)
+            logger.info(f"Loaded {len(dependents)} dependents for package: {pkg}")
+            for dep in tqdm(dependents, desc=f"Processing dependents for package: {pkg}"):
+                if dep.full_name not in mutual_dependents:
+                    mutual_dependents[dep.full_name] = dep
+        mutual_dependents = list(mutual_dependents.values())
+        mutual_dependents.sort(key=lambda x: x.full_name)
+        
+        logger.info(f"Found {len(mutual_dependents)} mutual dependents for packages: {', '.join(package_names)}")
+        return mutual_dependents
+
+    def save_mutual_dependents(self, package_names: List[str], mutual_dependents: List[DependentRepositoryInfo]):
+        import os
+        if not os.path.exists(LibrariesIOConfig.dependent_repo_info_save_dir):
+            os.makedirs(LibrariesIOConfig.dependent_repo_info_save_dir)
+        package_names_str = "_".join(package_names)
+        file_path = os.path.join(LibrariesIOConfig.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_mutual_dependents_{package_names_str}.jsonl")
+        with jsonlines.open(file_path, "w") as f:
+            f.write_all([dep.dict() for dep in mutual_dependents])
+        logger.info(f"Saved {len(mutual_dependents)} mutual dependents for packages {package_names_str} to {file_path}")
+        return file_path

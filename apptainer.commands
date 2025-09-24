@@ -1,0 +1,21 @@
+#!/bin/bash
+#SBATCH --job-name=security_pattern_miner
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=10G
+#SBATCH --time=24:00:00
+
+# Load apptainer module if needed
+module load apptainer
+apptainer build security_pattern_miner.sif security_pattern_miner/securityPatternMiner.def
+
+# Run the container with environment file and data volume
+apptainer run \
+    --bind ./build/volumes/data:/data \
+    --env-file .env \
+    security_pattern_miner.sif
+
+# Interactive shell
+apptainer shell \
+    --bind ./build/volumes/data:/data \
+    --env-file .env \
+    security_pattern_miner.sif

@@ -1,4 +1,3 @@
-
 Bootstrap: docker
 From: python:3.11.13-slim-trixie
 
@@ -12,5 +11,4 @@ From: python:3.11.13-slim-trixie
 %runscript
     cd /security_pattern_miner
     python ./runner.py
-
 
