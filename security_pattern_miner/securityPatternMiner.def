@@ -2,13 +2,14 @@ Bootstrap: docker
 From: python:3.11.13-slim-trixie
 
 %files
-    ./security_pattern_miner/src /security_pattern_miner/
+    ./security_pattern_miner/src /security_pattern_miner/src
     ./security_pattern_miner/requirements.txt /security_pattern_miner/requirements.txt
+    ./.env /security_pattern_miner/.env
 
 %post
     pip install --no-cache-dir -r /security_pattern_miner/requirements.txt
 
-%runscript
-    cd /security_pattern_miner
-    python ./runner.py
 
+%runscript
+    cd /security_pattern_miner/src
+    python ./runner.py
