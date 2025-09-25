@@ -1,3 +1,4 @@
+from logging import config
 import os
 import logging
 
@@ -31,10 +32,11 @@ class RepoCrawler(ABC):
 
 
 class GitCrawler(RepoCrawler):
-    def __init__(self):
+    def __init__(self, config: GitCrawlerConfig ):
         super().__init__()
-        self.root_data_dir = GitCrawlerConfig.root_data_dir
-        self.cloned_repos_dir = GitCrawlerConfig.cloned_repos_dir
+        self.root_data_dir = config.root_data_dir
+        self.cloned_repos_dir = config.cloned_repos_dir
+        self.config = config
         if not os.path.exists(self.cloned_repos_dir):
             os.makedirs(self.cloned_repos_dir)
 
@@ -44,8 +46,8 @@ class GitCrawler(RepoCrawler):
         repo_url = construct_github_repo_url(
             owner=owner,
             repo_name=name,
-            username=GitCrawlerConfig.git_username,
-            password=GitCrawlerConfig.git_password
+            username=self.config.git_username,
+            password=self.config.git_password
         )
         local_path = os.path.join(self.cloned_repos_dir, repo_name)
         if os.path.exists(local_path):
@@ -62,8 +64,8 @@ class GitCrawler(RepoCrawler):
 
     def crawl_from_dependent_repos_info(self, dependent_repos: list[DependentRepositoryInfo]):
         successfully_cloned = 0
-        start_index = GitCrawlerConfig.start_index
-        end_index = GitCrawlerConfig.end_index
+        start_index = self.config.start_index
+        end_index = self.config.end_index
         for repo in tqdm(dependent_repos[start_index:end_index], desc="Cloning repositories"):
             cloned_path = self.crawl(repo)
             if cloned_path:
