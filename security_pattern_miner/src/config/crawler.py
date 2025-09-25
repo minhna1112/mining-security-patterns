@@ -1,5 +1,4 @@
 import os
-
 class GitCrawlerConfig:
     git_executable_path = os.getenv("GIT_EXECUTABLE_PATH", "/usr/bin/git")
     git_username = os.getenv("GIT_USERNAME", "")
