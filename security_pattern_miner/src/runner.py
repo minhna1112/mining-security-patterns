@@ -10,9 +10,6 @@ from config.constants import PYTHON, PYPI
 from config.crawler import GitCrawlerConfig
 from config.libraries_io import LibrariesIOConfig
 
-logger.setLevel(logging.INFO)
-logger.setLevel(logging.WARNING)
-logger.setLevel(logging.ERROR)
 
 class Pipeline:
     def __init__(self, args):
@@ -103,6 +100,10 @@ if __name__ == "__main__":
     # password_based_auth_repos = python_dependent_miner.find_mutual_dependents(["fastapi", "passlib"])
     # python_dependent_miner.save_mutual_dependents(["fastapi", "passlib"], password_based_auth_repos)
 
+
+    # # Password-based and token-based authentication
+    # password_based_auth_repos = python_dependent_miner.find_mutual_dependents(["fastapi", "passlib", "pyjwt"])
+    # saved_jsonl_path = python_dependent_miner.save_mutual_dependents(["fastapi", "passlib", "pyjwt"], password_based_auth_repos)
 
     # # Password-based and token-based authentication
     # password_based_auth_repos = python_dependent_miner.find_mutual_dependents(["fastapi", "passlib", "pyjwt"])

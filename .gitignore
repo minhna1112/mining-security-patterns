@@ -4,3 +4,4 @@
 *.pyc
 *.jsonl
 *.sif
+**/*.pyc

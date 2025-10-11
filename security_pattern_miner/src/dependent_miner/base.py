@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import logging
+from time import time
 
 import requests
 from schemas.libraries_io_request import LibrariesIOGetDependentRequest
@@ -12,7 +13,6 @@ import json
 import jsonlines
 from tqdm import tqdm
 
-logger.setLevel(logging.INFO)
 class DependentMiner(ABC):
     @abstractmethod
     def get_dependents(self, package_name: str):
@@ -34,28 +34,28 @@ class LibrariesIODependentMiner(DependentMiner):
                 page=num_pages,
                 per_page=self.config.max_per_page
             )
-            if not dependents_in_page:
-                break
+
 
             if len(dependents_in_page) > self.config.max_per_page:
                 logger.warning(f"Received unexpected number of dependents for package {package_name} on page {num_pages}: {len(dependents_in_page)}")
-                break
+                return dependents
             
             dependents.extend(dependents_in_page)
             # Here you would typically make the API call and process the response
             logger.info(f"Fetched {len(dependents_in_page)} dependents from page {num_pages} for package {package_name}")
-            if len(dependents) == 0:
-                self.save_dependents_to_file(package_name, dependents_in_page)
-            else:
-                self.append_dependents_to_file(package_name, dependents_in_page)
+            if len(dependents_in_page) == 0:
+                return dependents
+
+            self.append_dependents_to_file(package_name, dependents_in_page)
             num_pages += 1
             
         return dependents
             
+
     def get_dependents_in_page(self, 
-                               package_name: str, 
-                               page: int, 
-                               per_page: int) -> List[DependentRepositoryInfo]:
+                            package_name: str, 
+                            page: int, 
+                            per_page: int) -> List[DependentRepositoryInfo]:
         request = LibrariesIOGetDependentRequest(
             package_manager=self.package_manager,
             package_name=package_name,
@@ -63,16 +63,40 @@ class LibrariesIODependentMiner(DependentMiner):
             per_page=per_page
         )
         url = get_libraries_io_url(request)
-        response = requests.get(url)
-        if response.status_code == 200:
-            dependents_data = response.json()
-            # print(json.dumps(dependents_data, indent=2))
-            dependents = [DependentRepositoryInfo(**data) for data in dependents_data]
-            return dependents
-        else:
-            response.raise_for_status()
-        # Here you would typically make the API call and process the response
-        
+
+        max_retries = self.config.max_retries  # Maximum number of retries
+        retry_delay = self.config.retry_delay  # Delay (in seconds) between retries
+        attempt = 0
+
+        while attempt < max_retries:
+            try:
+                response = requests.get(url)
+                
+                if response.status_code == 200:
+                    dependents_data = response.json()
+                    dependents = [DependentRepositoryInfo(**data) for data in dependents_data]
+                    return dependents
+                
+                elif response.status_code == 429:  # Rate limit error
+                    retry_after = int(response.headers.get("Retry-After", retry_delay))
+                    logger.warning(f"Rate limit reached. Retrying after {retry_after} seconds...")
+                    time.sleep(retry_after)
+                
+                else:
+                    logger.error(f"Failed to fetch dependents for package {package_name} on page {page}. "
+                                f"Status code: {response.status_code}, Response: {response.text}")
+                    break  # Exit the loop for non-retryable errors
+
+            except requests.RequestException as e:
+                logger.error(f"Request error for package {package_name} on page {page}: {e}")
+            
+            attempt += 1
+            logger.info(f"Retrying... (Attempt {attempt}/{max_retries})")
+            time.sleep(retry_delay)  # Throttle between retries
+
+        logger.error(f"Exceeded maximum retries for package {package_name} on page {page}. Returning empty list.")
+        return []
+    
     def save_dependents_to_file(self, package_name: str, dependents: List[DependentRepositoryInfo]):
         import os
         if not os.path.exists(self.config.dependent_repo_info_save_dir):
@@ -121,21 +145,22 @@ class LibrariesIODependentMiner(DependentMiner):
         import os
         if not os.path.exists(self.config.dependent_repo_info_save_dir):
             return
-        file_path = os.path.join(self.config.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_{self.config.start_page}.jsonl")
+        file_path = os.path.join(LibrariesIOConfig.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_{LibrariesIOConfig.start_page}.jsonl")
+        cleaned_file_path = os.path.join(LibrariesIOConfig.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_{LibrariesIOConfig.start_page}_cleaned.jsonl")
         if not os.path.exists(file_path):
             return
         unique_dependents = {}
         with jsonlines.open(file_path, "r") as f:
             for dep in f:
                 unique_dependents[dep['full_name']] = dep
-        with jsonlines.open(file_path, "w") as f:
+        with jsonlines.open(cleaned_file_path, "w") as f:
             f.write_all(unique_dependents.values())
     
     def load_saved_dependents(self, package_name: str) -> List[DependentRepositoryInfo]:
         import os
         if not os.path.exists(self.config.dependent_repo_info_save_dir):
             return []
-        file_path = os.path.join(self.config.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_{self.config.start_page}.jsonl")
+        file_path = os.path.join(LibrariesIOConfig.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_{LibrariesIOConfig.start_page}_cleaned.jsonl")
         if not os.path.exists(file_path):
             return []
         dependents = []
