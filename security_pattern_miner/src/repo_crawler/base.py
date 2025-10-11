@@ -16,7 +16,6 @@ from utils.github import is_github, construct_github_repo_url
 from tqdm import tqdm
 import jsonlines
 
-logger.setLevel(logging.INFO)
 
 
 class RepoCrawler(ABC):

@@ -10,9 +10,6 @@ from config.constants import PYTHON, PYPI
 from config.crawler import GitCrawlerConfig
 from config.libraries_io import LibrariesIOConfig
 
-logger.setLevel(logging.INFO)
-logger.setLevel(logging.WARNING)
-logger.setLevel(logging.ERROR)
 
 class Pipeline:
     def __init__(self, args):
