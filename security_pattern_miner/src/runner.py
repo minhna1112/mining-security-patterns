@@ -108,6 +108,10 @@ if __name__ == "__main__":
     # password_based_auth_repos = python_dependent_miner.find_mutual_dependents(["fastapi", "passlib", "pyjwt"])
     # saved_jsonl_path = python_dependent_miner.save_mutual_dependents(["fastapi", "passlib", "pyjwt"], password_based_auth_repos)
 
+    # # Password-based and token-based authentication
+    # password_based_auth_repos = python_dependent_miner.find_mutual_dependents(["fastapi", "passlib", "pyjwt"])
+    # saved_jsonl_path = python_dependent_miner.save_mutual_dependents(["fastapi", "passlib", "pyjwt"], password_based_auth_repos)
+
 
     # from repo_crawler.base import GitCrawler
     # git_crawler = GitCrawler()

@@ -121,21 +121,22 @@ class LibrariesIODependentMiner(DependentMiner):
         import os
         if not os.path.exists(self.config.dependent_repo_info_save_dir):
             return
-        file_path = os.path.join(self.config.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_{self.config.start_page}.jsonl")
+        file_path = os.path.join(LibrariesIOConfig.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_{LibrariesIOConfig.start_page}.jsonl")
+        cleaned_file_path = os.path.join(LibrariesIOConfig.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_{LibrariesIOConfig.start_page}_cleaned.jsonl")
         if not os.path.exists(file_path):
             return
         unique_dependents = {}
         with jsonlines.open(file_path, "r") as f:
             for dep in f:
                 unique_dependents[dep['full_name']] = dep
-        with jsonlines.open(file_path, "w") as f:
+        with jsonlines.open(cleaned_file_path, "w") as f:
             f.write_all(unique_dependents.values())
     
     def load_saved_dependents(self, package_name: str) -> List[DependentRepositoryInfo]:
         import os
         if not os.path.exists(self.config.dependent_repo_info_save_dir):
             return []
-        file_path = os.path.join(self.config.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_{self.config.start_page}.jsonl")
+        file_path = os.path.join(LibrariesIOConfig.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_{LibrariesIOConfig.start_page}_cleaned.jsonl")
         if not os.path.exists(file_path):
             return []
         dependents = []
