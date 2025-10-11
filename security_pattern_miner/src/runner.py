@@ -42,9 +42,16 @@ class Pipeline:
             for pkg in package_names:
                 self.dependent_miner.get_dependents(pkg)
                 self.dependent_miner.clean_saved_dependents(pkg)
+            
             if len(package_names) < 2:
                 logger.warning("At least two package names are required to find mutual dependents. Stopping")
                 return
+        
+        if self.args.clean_only:
+            logger.info("Cleaned saved dependents files. Stopping as --clean_only is set.")
+            for pkg in package_names:
+                self.dependent_miner.clean_saved_dependents(pkg)
+            return  
         
         if self.args.crawl_only:
             # Step 1: Find mutual dependents
@@ -78,7 +85,7 @@ if __name__ == "__main__":
     parser.add_argument("--start_page", type=int, default=1, help="Starting page number for fetching dependents")
     parser.add_argument("--root_data_dir", type=str, default="/data", help="Directory to save dependent repository info")
     
-    
+    parser.add_argument("--clean_only", action="store_true", help="Flag to only clean previously saved dependent info files and exit")
     # Git crawler related arguments
     parser.add_argument("--crawl_only", action="store_true", help="Flag to only crawl repositories from previously saved dependent info")
     parser.add_argument("--start_index", type=int, default=0, help="Start index for crawling repositories")

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import logging
-from time import time
+import time
 
 import requests
 from schemas.libraries_io_request import LibrariesIOGetDependentRequest
