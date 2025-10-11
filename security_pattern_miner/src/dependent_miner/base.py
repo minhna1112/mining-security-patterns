@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import logging
+from time import time
 
 import requests
 from schemas.libraries_io_request import LibrariesIOGetDependentRequest
@@ -50,10 +51,11 @@ class LibrariesIODependentMiner(DependentMiner):
             
         return dependents
             
+
     def get_dependents_in_page(self, 
-                               package_name: str, 
-                               page: int, 
-                               per_page: int) -> List[DependentRepositoryInfo]:
+                            package_name: str, 
+                            page: int, 
+                            per_page: int) -> List[DependentRepositoryInfo]:
         request = LibrariesIOGetDependentRequest(
             package_manager=self.package_manager,
             package_name=package_name,
@@ -61,17 +63,40 @@ class LibrariesIODependentMiner(DependentMiner):
             per_page=per_page
         )
         url = get_libraries_io_url(request)
-        
-        response = requests.get(url)
-        if response.status_code == 200:
-            dependents_data = response.json()
-            # print(json.dumps(dependents_data, indent=2))
-            dependents = [DependentRepositoryInfo(**data) for data in dependents_data]
-            return dependents
-        else:
-            response.raise_for_status()
-        # Here you would typically make the API call and process the response
+
+        max_retries = self.config.max_retries  # Maximum number of retries
+        retry_delay = self.config.retry_delay  # Delay (in seconds) between retries
+        attempt = 0
+
+        while attempt < max_retries:
+            try:
+                response = requests.get(url)
+                
+                if response.status_code == 200:
+                    dependents_data = response.json()
+                    dependents = [DependentRepositoryInfo(**data) for data in dependents_data]
+                    return dependents
+                
+                elif response.status_code == 429:  # Rate limit error
+                    retry_after = int(response.headers.get("Retry-After", retry_delay))
+                    logger.warning(f"Rate limit reached. Retrying after {retry_after} seconds...")
+                    time.sleep(retry_after)
+                
+                else:
+                    logger.error(f"Failed to fetch dependents for package {package_name} on page {page}. "
+                                f"Status code: {response.status_code}, Response: {response.text}")
+                    break  # Exit the loop for non-retryable errors
+
+            except requests.RequestException as e:
+                logger.error(f"Request error for package {package_name} on page {page}: {e}")
+            
+            attempt += 1
+            logger.info(f"Retrying... (Attempt {attempt}/{max_retries})")
+            time.sleep(retry_delay)  # Throttle between retries
+
+        logger.error(f"Exceeded maximum retries for package {package_name} on page {page}. Returning empty list.")
         return []
+    
     def save_dependents_to_file(self, package_name: str, dependents: List[DependentRepositoryInfo]):
         import os
         if not os.path.exists(self.config.dependent_repo_info_save_dir):
