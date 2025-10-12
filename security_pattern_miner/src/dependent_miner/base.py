@@ -173,14 +173,23 @@ class LibrariesIODependentMiner(DependentMiner):
         if len(package_names) < 2:
             logger.warning("At least two package names are required to find mutual dependents.")
             return []
-        mutual_dependents = {}
+        
+        # Store dependents for each package
+        package_dependents = {}
+        
+        # Load dependents for each package
         for pkg in package_names:
             dependents = self.load_saved_dependents(pkg)
+            package_dependents[pkg] = {dep.full_name: dep for dep in dependents}
             logger.info(f"Loaded {len(dependents)} dependents for package: {pkg}")
-            for dep in tqdm(dependents, desc=f"Processing dependents for package: {pkg}"):
-                if dep.full_name not in mutual_dependents:
-                    mutual_dependents[dep.full_name] = dep
-        mutual_dependents = list(mutual_dependents.values())
+        
+        # Find repositories that depend on all packages
+        common_repo_names = set(package_dependents[package_names[0]].keys())
+        for pkg in package_names[1:]:
+            common_repo_names &= set(package_dependents[pkg].keys())
+        
+        # Get the actual repository objects
+        mutual_dependents = [package_dependents[package_names[0]][repo_name] for repo_name in common_repo_names]
         mutual_dependents.sort(key=lambda x: x.full_name)
         
         logger.info(f"Found {len(mutual_dependents)} mutual dependents for packages: {', '.join(package_names)}")
