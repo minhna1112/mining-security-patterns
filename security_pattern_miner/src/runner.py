@@ -2,16 +2,23 @@ import os
 from utils.logger import logger
 import logging
 from dependent_miner.python import PythonDependentMiner
+ 
+from dependent_miner.java import JavaDependentMiner
 from repo_crawler.base import GitCrawler
-from config.constants import PYTHON, PYPI
+from config.constants import PYTHON, PYPI, JAVA, MAVEN
 from config.crawler import GitCrawlerConfig
 from config.libraries_io import LibrariesIOConfig
 
 
+dependent_miners = {
+    (PYTHON, PYPI): PythonDependentMiner,
+    (JAVA, MAVEN): JavaDependentMiner
+}
+
 class Pipeline:
     def __init__(self, args):
-        if args.language.lower() != PYTHON or args.package_manager != PYPI:
-            raise ValueError("Currently, only Python language with PyPI package manager is supported.")
+        # if args.language.lower() != PYTHON or args.package_manager != PYPI:
+        #     raise ValueError("Currently, only Python language with PyPI package manager is supported.")
         
         self.args = args
         if args.max_pages:
@@ -30,7 +37,7 @@ class Pipeline:
             GitCrawlerConfig.root_data_dir = args.root_data_dir
             GitCrawlerConfig.cloned_repos_dir = os.path.join(args.root_data_dir, "cloned_repos")
 
-        self.dependent_miner = PythonDependentMiner(LibrariesIOConfig)
+        self.dependent_miner = dependent_miners.get((args.language.lower(), args.package_manager), None)(LibrariesIOConfig)
         self.repo_crawler = GitCrawler(GitCrawlerConfig)
 
     def run(self, package_names: list[str]):
