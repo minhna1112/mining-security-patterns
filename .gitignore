@@ -5,3 +5,4 @@
 *.jsonl
 *.sif
 **/*.pyc
+./build/volumes/zoekt/index-data/*
