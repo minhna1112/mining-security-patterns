@@ -8,7 +8,7 @@ services:
       - ./build/volumes/data:/data
     env_file:
       - ./.env
-    command: ["python", "./runner.py"]
+    command: ["python", "./runner.py", "--get_dependents", "--package_names", "org.springframework.security:spring-security-core", "--language", "java", "--package_manager", "Maven", "--root_data_dir=/data"]
     deploy:
       resources:
         limits:
@@ -17,3 +17,63 @@ services:
         reservations:
           cpus: '4.0'
           memory: 4G
+
+  zoekt-webserver:
+    image: zoekt-local
+    ports:
+      - "6070:6070"  # Default zoekt-webserver port
+    volumes:
+      - ./build/volumes/zoekt/index-data:/data/index:ro  # Read-only access to index data
+    environment:
+      - DATA_DIR=/data/index
+      - GOGC=25
+    command: zoekt-webserver -index /data/index -pprof -rpc -listen :6070
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:6070/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+          
+  zoekt-indexer:
+    image: zoekt-local
+    volumes:
+      - ./build/volumes/zoekt/index-data:/data/index
+      - ./build/volumes/data/cloned_repos:/repos:ro  # Mount local repos directory
+    working_dir: /repos
+    command: |
+      sh -c "
+        echo 'Starting repository indexing...'
+        mkdir -p /data/index
+        
+        # Check if repos directory exists and has content
+        if [ ! -d '/repos' ]; then
+          echo 'Error: /repos directory not found'
+          exit 1
+        fi
+        
+        # List contents of repos directory
+        echo 'Contents of /repos:'
+        ls -la /repos/
+        
+        # Find and index repositories
+        cd /repos
+        for repo in */; do
+          if [ -d \"$$repo\" ]; then
+            echo \"Found directory: $$repo\"
+            if [ -d \"$$repo/.git\" ]; then
+              echo \"Indexing Git repository: $$repo\"
+              zoekt-git-index -index /data/index \"/repos/$$repo\"
+            else
+              echo \"Indexing directory: $$repo\"
+              zoekt-index -index /data/index \"/repos/$$repo\"
+            fi
+          fi
+        done
+        
+        if [ ! -f /data/index/*.zoekt ]; then
+          echo 'No repositories found to index. Please add repositories to the ./repos directory'
+        else
+          echo 'Indexing complete!'
+        fi
+      "
