@@ -1,5 +1,5 @@
 ./build/volumes/*
-./build/volumes/zoekt/index-data/*.zoekt
+build/volumes/zoekt/index-data/*.zoekt
 .env
 */__pycache__/*
 *.pyc
