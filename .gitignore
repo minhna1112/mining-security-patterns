@@ -1,8 +1,9 @@
 ./build/volumes/*
+./build/volumes/zoekt/index-data/*.zoekt
 .env
 */__pycache__/*
 *.pyc
 *.jsonl
 *.sif
 **/*.pyc
-./build/volumes/zoekt/index-data/*
+# 
