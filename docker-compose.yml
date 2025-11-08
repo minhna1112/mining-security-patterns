@@ -22,7 +22,7 @@ services:
     build:
       context: ./security_pattern_miner
       dockerfile: securityPatternMiner.dockerfile
-    image: security_pattern_miner:latest
+    image: security_pattern_miner:latest 
     volumes:
       - ./build/volumes/data:/data
     env_file:
