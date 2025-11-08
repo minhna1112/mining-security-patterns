@@ -6,4 +6,7 @@ build/volumes/zoekt/index-data/*.zoekt
 *.jsonl
 *.sif
 **/*.pyc
-# 
+.DS_Store
+.vscode/
+.claude
+.idea/
