@@ -18,6 +18,25 @@ services:
           cpus: '4.0'
           memory: 4G
 
+  security_pattern_extractor:
+    build:
+      context: ./security_pattern_miner
+      dockerfile: securityPatternMiner.dockerfile
+    image: security_pattern_miner:latest
+    volumes:
+      - ./build/volumes/data:/data
+    env_file:
+      - ./.env
+    command: ["python", "./runner.py", "--construct_queries", "--pattern", "password_based_authentication", "--web_framework", "fastapi", "--language", "python", "--root_data_dir=/data"]
+    deploy:
+      resources:
+        limits:
+          cpus: '8.0'
+          memory: 10G
+        reservations:
+          cpus: '4.0'
+          memory: 4G
+
   zoekt-webserver:
     image: zoekt-local
     ports:
