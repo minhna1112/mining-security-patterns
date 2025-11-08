@@ -100,29 +100,33 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Run the dependent miner and repo crawler")
     
-    # Libaries.io related arguments
-    parser.add_argument("--get_dependents", action="store_true", help="Flag to get dependents for the specified package names (from scratch)")
+    # # Libaries.io related arguments
+    # parser.add_argument("--get_dependents", action="store_true", help="Flag to get dependents for the specified package names (from scratch)")
     parser.add_argument("--language", type=str, default=PYTHON, help="Programming language")
-    parser.add_argument("--package_manager", type=str, default=PYPI, help="Package manager")
-    parser.add_argument("--package_names", type=str, nargs='+', required=True, help="List of package names to find mutual dependents")
-    parser.add_argument("--max_pages", type=int, default=2000, help="Maximum number of pages to fetch from Libraries.io")
-    parser.add_argument("--per_page", type=int, default=100, help="Number of results per page from Libraries.io")
-    parser.add_argument("--start_page", type=int, default=1, help="Starting page number for fetching dependents")
+    # parser.add_argument("--package_manager", type=str, default=PYPI, help="Package manager")
+    # parser.add_argument("--package_names", type=str, nargs='+', required=True, help="List of package names to find mutual dependents")
+    # parser.add_argument("--max_pages", type=int, default=2000, help="Maximum number of pages to fetch from Libraries.io")
+    # parser.add_argument("--per_page", type=int, default=100, help="Number of results per page from Libraries.io")
+    # parser.add_argument("--start_page", type=int, default=1, help="Starting page number for fetching dependents")
     parser.add_argument("--root_data_dir", type=str, default="/data", help="Directory to save dependent repository info")
     
-    parser.add_argument("--clean_only", action="store_true", help="Flag to only clean previously saved dependent info files and exit")
-    # Git crawler related arguments
-    parser.add_argument("--crawl_only", action="store_true", help="Flag to only crawl repositories from previously saved dependent info")
-    parser.add_argument("--start_index", type=int, default=0, help="Start index for crawling repositories")
-    parser.add_argument("--end_index", type=int, default=-1, help="End index for crawling repositories")
+    # parser.add_argument("--clean_only", action="store_true", help="Flag to only clean previously saved dependent info files and exit")
+    # # Git crawler related arguments
+    # parser.add_argument("--crawl_only", action="store_true", help="Flag to only crawl repositories from previously saved dependent info")
+    # parser.add_argument("--start_index", type=int, default=0, help="Start index for crawling repositories")
+    # parser.add_argument("--end_index", type=int, default=-1, help="End index for crawling repositories")
     
+    parser.add_argument("--construct_queries", action="store_true", help="Flag to construct queries based on the specified pattern")
+    parser.add_argument("--pattern", type=str, default="", help="Security pattern name for query construction")
+    parser.add_argument("--web_framework", type=str, default="fastapi", help="Web framework name for query construction")
+    # parser.add_argument("--root_data_dir", type=str, default="/
     args = parser.parse_args()
     
     
     
-    pipeline = Pipeline(args)
-    # print(args.package_names)
-    pipeline.run(args.package_names)
+    # pipeline = Pipeline(args)
+    # # print(args.package_names)
+    # pipeline.run(args.package_names)
     # python_dependent_miner.get_dependents("flask")
     # python_dependent_miner.clean_saved_dependents("flask")
     
