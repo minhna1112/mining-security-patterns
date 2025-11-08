@@ -1,0 +1,457 @@
+pattern:
+  name: "Obscure Token-Based Access Control (API Keys)"
+  id: "01_01_005"
+  description: "A subject is both authenticated and authorized based on an obscure token (API key, PAT). Long-lived tokens that combine authentication and authorization with potentially limited privileges"
+  
+dependencies:
+  - fastapi
+  - sqlalchemy
+  - hashlib  # built-in
+  - secrets  # built-in
+  - datetime  # built-in
+
+roles:
+  enforcer:
+    description: "Ensures the token provided by the Subject is verified before processing"
+    queries:
+      - query: "APIKeyHeader X-API-Key auto_error"
+        description: "API key header enforcement"
+        priority: high
+      
+      - query: "APIKeyQuery api_key Security"
+        description: "API key query parameter enforcement"
+        priority: medium
+      
+      - query: "api_key_header = APIKeyHeader(name=\"X-API-Key\")"
+        description: "API key header scheme initialization"
+        priority: high
+      
+      - query: "api_key: str = Security(api_key_header)"
+        description: "API key dependency with Security"
+        priority: high
+      
+      - query: "api_key: Optional[str] = Security(api_key_header)"
+        description: "Optional API key for mixed auth"
+        priority: medium
+
+  validator:
+    description: "Validates API key and checks permissions (combined auth + authz)"
+    queries:
+      - query: "class APIKeyValidator required_permissions"
+        description: "Combined auth+authz validator"
+        priority: high
+      
+      - query: "validate_token HTTPException 401 403"
+        description: "API key validation with auth/authz errors"
+        priority: high
+      
+      - query: "async def __call__ api_key: str = Security"
+        description: "Validator callable with API key"
+        priority: high
+      
+      - query: "token_info = manager.validate_token(api_key)"
+        description: "Token validation call"
+        priority: high
+      
+      - query: "if not token_info: raise HTTPException 401"
+        description: "Invalid token handling"
+        priority: medium
+      
+      - query: "missing = set(required_permissions) - token_info.permissions"
+        description: "Missing permission check"
+        priority: high
+
+  hasher:
+    description: "Calculates the hash value for a token"
+    queries:
+      - query: "hashlib.sha256 token.encode hexdigest"
+        description: "Token hashing with SHA-256"
+        priority: high
+      
+      - query: "hashlib.blake2b token_hash"
+        description: "Token hashing with BLAKE2b"
+        priority: medium
+      
+      - query: "def hash_token(token: str) -> str"
+        description: "Token hashing function"
+        priority: high
+      
+      - query: "token_hash = hashlib.sha256(token.encode()).hexdigest()"
+        description: "Direct token hashing call"
+        priority: high
+
+  token_manager:
+    description: "Keeps track of valid tokens with principals and permissions"
+    queries:
+      - query: "class APIKey token_hash principal permissions"
+        description: "API key database model"
+        priority: high
+      
+      - query: "db.query APIKey token_hash"
+        description: "API key database queries"
+        priority: high
+      
+      - query: "class APIKeyManager create_api_key validate_token"
+        description: "API key manager class"
+        priority: high
+      
+      - query: "api_key.permissions api_key.principal"
+        description: "API key attributes access"
+        priority: medium
+      
+      - query: "expires_at created_at last_used"
+        description: "API key lifecycle tracking"
+        priority: medium
+      
+      - query: "Column JSON permissions"
+        description: "Permission storage in database"
+        priority: medium
+
+  token_generator:
+    description: "Generates a new token when requested"
+    queries:
+      - query: "secrets.token_urlsafe 32"
+        description: "Secure API key generation (32+ bytes)"
+        priority: high
+      
+      - query: "secrets.token_hex 32"
+        description: "Hex token generation"
+        priority: medium
+      
+      - query: "def generate_token() -> str"
+        description: "Token generation function"
+        priority: high
+      
+      - query: "@staticmethod def generate_token"
+        description: "Static token generator method"
+        priority: medium
+
+  registrar:
+    description: "Generates new tokens and registers them with the token manager"
+    queries:
+      - query: "@app.post /api-keys secrets.token"
+        description: "API key creation endpoint"
+        priority: high
+      
+      - query: "token_hash = hashlib.sha256 db.add APIKey"
+        description: "API key registration with hashing"
+        priority: high
+      
+      - query: "return api_key Save this key"
+        description: "API key response (shown once)"
+        priority: high
+      
+      - query: "def create_api_key principal permissions expires_delta"
+        description: "API key creation function signature"
+        priority: high
+      
+      - query: "async def create_api_key principal: str = Depends(get_authenticated_user)"
+        description: "API key creation requiring authentication"
+        priority: high
+
+  permission_checker:
+    description: "Checks if token has required permissions"
+    queries:
+      - query: "token_info.permissions HTTPException 403"
+        description: "Permission verification"
+        priority: high
+      
+      - query: "if self.required_permissions missing_perms"
+        description: "Required permission check"
+        priority: high
+      
+      - query: "set(required_permissions) - token_info.permissions"
+        description: "Missing permission calculation"
+        priority: high
+
+complete_implementation:
+  description: "Queries to find files with complete API key authentication implementation"
+  queries:
+    - query: "APIKeyHeader hashlib.sha256 secrets.token db.query APIKey lang:python"
+      description: "Complete API key authentication pattern"
+      priority: critical
+      min_matches: 4
+    
+    - query: "@app.post /api-keys secrets.token_urlsafe hash db.add lang:python -file:test"
+      description: "API key creation endpoint"
+      priority: high
+      min_matches: 3
+    
+    - query: "class APIKeyValidator validate_token permissions HTTPException lang:python"
+      description: "API key validator with authorization"
+      priority: high
+      min_matches: 3
+
+endpoints:
+  create_api_key:
+    queries:
+      - "@app.post /api-keys"
+      - "async def create_api_key name: str permissions: List[str]"
+      - "token = secrets.token_urlsafe"
+      - "message Save this key securely"
+  
+  list_api_keys:
+    queries:
+      - "@app.get /api-keys"
+      - "def list_api_keys principal = Depends"
+      - "manager.list_user_keys(principal)"
+  
+  revoke_api_key:
+    queries:
+      - "@app.delete /api-keys/{key_id}"
+      - "async def revoke_api_key key_id: str"
+      - "db.delete(api_key)"
+  
+  protected_endpoint:
+    queries:
+      - "token_info: TokenInfo = Depends(APIKeyValidator"
+      - "token_info = Depends(require_api_permissions"
+      - "api_key: str = Security(api_key_header)"
+
+api_key_features:
+  named_keys:
+    queries:
+      - "name: Optional[str] api_key.name"
+      - "Create API key with name"
+  
+  expiration:
+    queries:
+      - "expires_at: Optional[DateTime]"
+      - "expires_delta: Optional[timedelta]"
+      - "if api_key.expires_at and datetime.utcnow() > api_key.expires_at"
+  
+  last_used_tracking:
+    queries:
+      - "last_used: Optional[DateTime]"
+      - "api_key.last_used = datetime.utcnow()"
+      - "update_last_used"
+  
+  scoped_permissions:
+    queries:
+      - "permissions: List[str]"
+      - "api_key.permissions"
+      - "token-specific privileges"
+  
+  multiple_keys:
+    queries:
+      - "list_user_keys(principal)"
+      - "for key in keys"
+      - "api_keys: List[APIKey]"
+
+permission_models:
+  permission_enum:
+    queries:
+      - "class Permission str Enum"
+      - "Permission.DATA_READ Permission.DATA_WRITE"
+      - "Set[str] permissions"
+  
+  token_info:
+    queries:
+      - "class TokenInfo principal permissions"
+      - "TokenInfo(principal=, permissions=)"
+      - "token_info.principal token_info.permissions"
+  
+  permission_check:
+    queries:
+      - "def require_api_permissions(permissions: List[str])"
+      - "APIKeyValidator(required_permissions=permissions)"
+      - "missing = set(required) - token_info.permissions"
+
+security_features:
+  hash_storage:
+    queries:
+      - "token_hash = hashlib.sha256(token.encode()).hexdigest()"
+      - "Column(String, unique=True) token_hash"
+      - "hash_token store_hash"
+  
+  show_once:
+    queries:
+      - "Save this key securely won't be shown again"
+      - "return {\"api_key\": token, \"message\":"
+      - "plaintext token database hash"
+  
+  revocation:
+    queries:
+      - "db.delete(api_key)"
+      - "revoke_token invalidate_key"
+      - "@app.delete /api-keys"
+  
+  entropy:
+    queries:
+      - "secrets.token_urlsafe(32)"
+      - "secrets.token_urlsafe(64)"
+      - "128 bits 256 bits"
+
+sensitive_actions:
+  description: "Actions that should NOT be allowed with API keys"
+  queries:
+    - query: "@app.post /account/delete Depends(get_authenticated_user) -APIKey"
+      description: "Account deletion requiring full auth"
+      priority: high
+    
+    - query: "@app.post /api-keys Depends(get_authenticated_user)"
+      description: "API key creation requiring password auth"
+      priority: high
+    
+    - query: "@app.post /password/change -api_key -APIKey"
+      description: "Password change not accessible via API key"
+      priority: high
+
+anti_patterns:
+  description: "Security anti-patterns to detect"
+  
+  plaintext_storage:
+    query: "Column String api_key -hash -token_hash"
+    severity: critical
+  
+  weak_tokens:
+    query: "secrets.token_urlsafe(8) secrets.token_urlsafe(16)"
+    severity: critical
+  
+  no_hashing:
+    query: "api_key = secrets.token db.add -hash"
+    severity: critical
+  
+  predictable_tokens:
+    query: "uuid.uuid4() random.randint -secrets"
+    severity: critical
+  
+  no_expiration:
+    query: "class APIKey -expires_at -expiration"
+    severity: medium
+  
+  overprivileged_keys:
+    query: "permissions = [\"*\"] permissions = [\"all\"]"
+    severity: high
+  
+  api_key_for_sensitive:
+    query: "@app.delete /account api_key APIKeyHeader"
+    severity: high
+
+filters:
+  language: python
+  file_extension: "\\.py$"
+  exclude_tests: true
+  exclude_forks: true
+  exclude_archived: true
+
+search_strategy:
+  steps:
+    - name: "Find Enforcer"
+      queries: ["APIKeyHeader", "APIKeyQuery", "X-API-Key"]
+      
+    - name: "Find Token Generator"
+      queries: ["secrets.token_urlsafe", "secrets.token_hex"]
+      
+    - name: "Find Hasher"
+      queries: ["hashlib.sha256", "hash_token"]
+      
+    - name: "Find Token Manager"
+      queries: ["class APIKey", "token_hash principal permissions"]
+      
+    - name: "Find Validator"
+      queries: ["validate_token", "APIKeyValidator"]
+      
+    - name: "Verify Security"
+      queries: ["hashlib secrets db.query", "httponly=False secure=False"]
+
+best_practices:
+  token_generation:
+    queries:
+      - "secrets.token_urlsafe(32)"
+      - "secrets.token_urlsafe(64)"
+      - "token_bytes(32)"
+    description: "At least 128 bits (16 bytes) of entropy"
+  
+  hash_algorithm:
+    queries:
+      - "hashlib.sha256"
+      - "hashlib.blake2b"
+      - "hashlib.sha3_256"
+    description: "Use secure hash functions"
+  
+  permission_scoping:
+    queries:
+      - "permissions: List[str]"
+      - "limited_permissions subset"
+      - "read-only write-only"
+    description: "Scope permissions per API key"
+  
+  expiration:
+    queries:
+      - "expires_at: Optional[DateTime]"
+      - "timedelta(days=90)"
+      - "check_expiration"
+    description: "Set expiration dates for API keys"
+  
+  revocation:
+    queries:
+      - "@app.delete /api-keys/{key_id}"
+      - "revoke_token invalidate"
+      - "db.delete(api_key)"
+    description: "Allow users to revoke API keys"
+
+database_models:
+  sqlalchemy:
+    queries:
+      - "class APIKey(Base):"
+      - "__tablename__ = \"api_keys\""
+      - "id = Column(String, primary_key=True)"
+      - "token_hash = Column(String, unique=True, nullable=False)"
+      - "principal = Column(String, nullable=False)"
+      - "permissions = Column(JSON)"
+      - "created_at = Column(DateTime, default=datetime.utcnow)"
+      - "expires_at = Column(DateTime, nullable=True)"
+      - "last_used = Column(DateTime, nullable=True)"
+  
+  tortoise:
+    queries:
+      - "class APIKey(Model):"
+      - "token_hash = fields.CharField(max_length=64, unique=True)"
+      - "principal = fields.CharField(max_length=255)"
+      - "permissions = fields.JSONField()"
+      - "created_at = fields.DatetimeField(auto_now_add=True)"
+
+integration_patterns:
+  with_session_auth:
+    queries:
+      - "session_id = Depends(cookie_scheme) api_key = Security(api_key_header)"
+      - "verify_session or verify_api_key"
+      - "Optional[str] = Security multiple auth"
+  
+  with_oauth:
+    queries:
+      - "OAuth2PasswordBearer APIKeyHeader"
+      - "token or api_key"
+      - "bearer_token api_key dual authentication"
+  
+  rate_limiting:
+    queries:
+      - "rate_limit = Depends(RateLimiter"
+      - "api_key rate_limit"
+      - "slowapi api_key"
+
+use_cases:
+  personal_access_tokens:
+    queries:
+      - "PAT personal access token"
+      - "github_token gitlab_token"
+      - "user-generated API key"
+  
+  service_accounts:
+    queries:
+      - "service_account api_key"
+      - "machine-to-machine authentication"
+      - "automated_access"
+  
+  webhooks:
+    queries:
+      - "webhook_secret api_key"
+      - "callback authentication"
+      - "verify_webhook_signature"
+  
+  third_party_integrations:
+    queries:
+      - "integration_key partner_key"
+      - "external_service api_key"
+      - "third_party authentication"

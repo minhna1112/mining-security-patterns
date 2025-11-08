@@ -8,7 +8,8 @@ from repo_crawler.base import GitCrawler
 from config.constants import PYTHON, PYPI, JAVA, MAVEN
 from config.crawler import GitCrawlerConfig
 from config.libraries_io import LibrariesIOConfig
-
+from config.queries_loader import QueriesLoaderConfig
+from context_retriever.queries_loader import QueriesLoader
 
 dependent_miners = {
     (PYTHON, PYPI): PythonDependentMiner,
@@ -36,6 +37,16 @@ class Pipeline:
             LibrariesIOConfig.dependent_repo_info_save_dir = os.path.join(args.root_data_dir, "dependent_repos_info")
             GitCrawlerConfig.root_data_dir = args.root_data_dir
             GitCrawlerConfig.cloned_repos_dir = os.path.join(args.root_data_dir, "cloned_repos")
+            QueriesLoaderConfig.root_data_dir = args.root_data_dir
+            QueriesLoaderConfig.repos_name_dir = os.path.join(args.root_data_dir, "dependent_repos_info")
+            QueriesLoaderConfig.output_queries_dir = os.path.join(args.root_data_dir, "output_queries")
+        if args.construct_queries and args.pattern:
+            self.query_constructor = QueriesLoader(
+                language=args.language.lower(),
+                package_manager=args.package_manager,
+                pattern=args.pattern,
+                config=QueriesLoaderConfig
+            )
 
         self.dependent_miner = dependent_miners.get((args.language.lower(), args.package_manager), None)(LibrariesIOConfig)
         self.repo_crawler = GitCrawler(GitCrawlerConfig)
@@ -73,7 +84,14 @@ class Pipeline:
             # Step 4: Crawl and clone the dependent repositories
             self.repo_crawler.crawl_from_dependent_repos_info(dependent_repos)
             logger.info("Completed crawling and cloning dependent repositories")
-    
+            
+        if self.args.construct_queries:
+            self.query_constructor.load_from_pattern_metadata_file(
+                file_path=os.path.join('./context/retriever/queries_library', self.query_constructor.yaml_path_postfix)
+            )
+            queries = self.query_constructor.load_queries()
+            output_file_path = os.path.join(QueriesLoaderConfig.output_queries_dir, f"{self.args.language}_{self.args.package_manager}_mutual_dependents.jsonl")
+            self.query_constructor.save_queries_to_file()
 
 if __name__ == "__main__":
     import argparse
@@ -94,6 +112,7 @@ if __name__ == "__main__":
     parser.add_argument("--crawl_only", action="store_true", help="Flag to only crawl repositories from previously saved dependent info")
     parser.add_argument("--start_index", type=int, default=0, help="Start index for crawling repositories")
     parser.add_argument("--end_index", type=int, default=-1, help="End index for crawling repositories")
+    
     args = parser.parse_args()
     
     

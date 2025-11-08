@@ -1,0 +1,320 @@
+pattern:
+  name: "Opaque Token-Based Authentication (Session)"
+  id: "01_01_004"
+  description: "A subject is authenticated based on a unique, opaque token. The token is meaningless on its own; the system maintains a mapping of tokens to principals"
+  
+dependencies:
+  - fastapi
+  - redis[asyncio]
+  - cachetools  # alternative to redis
+  - secrets  # built-in
+
+roles:
+  enforcer:
+    description: "Ensures the token provided by the Subject is verified before the requested action is processed"
+    queries:
+      - query: "APIKeyCookie name session_id"
+        description: "Cookie-based session enforcement"
+        priority: high
+      
+      - query: "APIKeyHeader X-Session-Token"
+        description: "Header-based session enforcement"
+        priority: high
+      
+      - query: "cookie_scheme = APIKeyCookie"
+        description: "Cookie security scheme initialization"
+        priority: high
+      
+      - query: "session_id: str = Depends(cookie_scheme)"
+        description: "Session ID dependency injection"
+        priority: high
+
+  verifier:
+    description: "Verifies whether the received token corresponds to a known principal"
+    queries:
+      - query: "async def verify_session session_manager"
+        description: "Session verification functions"
+        priority: high
+      
+      - query: "session_id HTTPException 401"
+        description: "Session validation with error handling"
+        priority: high
+      
+      - query: "def get_current_user session_id = Depends"
+        description: "Current user extraction from session"
+        priority: high
+      
+      - query: "session_manager.get_principal(session_id)"
+        description: "Principal retrieval from session"
+        priority: high
+      
+      - query: "if principal is None raise HTTPException"
+        description: "Invalid session error handling"
+        priority: medium
+
+  principal_provider_redis:
+    description: "Keeps track of valid tokens and principals using Redis"
+    queries:
+      - query: "redis.setex session: principal"
+        description: "Redis session storage"
+        priority: high
+      
+      - query: "await redis.get session:"
+        description: "Async Redis session retrieval"
+        priority: high
+      
+      - query: "redis.from_url redis://"
+        description: "Redis connection setup"
+        priority: high
+      
+      - query: "redis_client.setex(f\"session:{token}\""
+        description: "Session storage with f-string key"
+        priority: high
+      
+      - query: "await redis.delete session:"
+        description: "Session deletion"
+        priority: medium
+
+  principal_provider_memory:
+    description: "Keeps track of valid tokens and principals using in-memory cache"
+    queries:
+      - query: "TTLCache maxsize ttl"
+        description: "In-memory session cache"
+        priority: medium
+      
+      - query: "from cachetools import TTLCache"
+        description: "TTLCache import"
+        priority: medium
+      
+      - query: "sessions = TTLCache"
+        description: "Session cache initialization"
+        priority: medium
+      
+      - query: "sessions[token] = principal"
+        description: "In-memory session storage"
+        priority: low
+
+  token_generator:
+    description: "Generates a new token when requested"
+    queries:
+      - query: "secrets.token_urlsafe secrets.token_hex"
+        description: "Secure session token generation"
+        priority: high
+      
+      - query: "session_id = secrets.token_urlsafe(32)"
+        description: "Session ID generation (32 bytes)"
+        priority: high
+      
+      - query: "token = secrets.token_hex"
+        description: "Hex token generation"
+        priority: medium
+      
+      - query: "secrets.token_bytes random"
+        description: "Random token generation"
+        priority: low
+
+  registrar:
+    description: "Handles the registration of tokens for principals"
+    queries:
+      - query: "@app.post /login response.set_cookie session_id"
+        description: "Login with session cookie creation"
+        priority: high
+      
+      - query: "redis.setex httponly secure"
+        description: "Session registration with secure cookies"
+        priority: high
+      
+      - query: "async def login response: Response session_manager"
+        description: "Login endpoint with session manager"
+        priority: high
+      
+      - query: "session_id = await session_manager.create_session"
+        description: "Session creation call"
+        priority: high
+      
+      - query: "response.set_cookie httponly=True secure=True"
+        description: "Secure cookie attributes"
+        priority: medium
+
+  session_manager:
+    description: "Manages the lifecycle of sessions including creation, validation, and invalidation"
+    queries:
+      - query: "class SessionManager create_session"
+        description: "Session management class"
+        priority: high
+      
+      - query: "async def get_principal async def invalidate_session"
+        description: "Session lifecycle methods"
+        priority: high
+      
+      - query: "session_timeout absolute_timeout"
+        description: "Session timeout configuration"
+        priority: high
+      
+      - query: "def create_session(self, principal: str) -> str"
+        description: "Session creation method signature"
+        priority: high
+      
+      - query: "last_activity datetime.utcnow"
+        description: "Activity-based timeout tracking"
+        priority: medium
+      
+      - query: "invalidate_all_sessions principal"
+        description: "Multiple session invalidation"
+        priority: low
+
+complete_implementation:
+  description: "Queries to find files with complete session authentication implementation"
+  queries:
+    - query: "APIKeyCookie secrets.token redis.setex response.set_cookie lang:python"
+      description: "Complete session authentication pattern"
+      priority: critical
+      min_matches: 4
+    
+    - query: "@app.post /login session_manager.create_session httponly lang:python -file:test"
+      description: "Login endpoint with session management"
+      priority: high
+      min_matches: 3
+    
+    - query: "class SessionManager redis async def create_session lang:python"
+      description: "Session manager with Redis backend"
+      priority: high
+      min_matches: 3
+
+endpoints:
+  login:
+    queries:
+      - "@app.post /login response.set_cookie"
+      - "async def login response: Response"
+      - "session_id = secrets.token httponly"
+  
+  logout:
+    queries:
+      - "@app.post /logout invalidate_session"
+      - "response.delete_cookie session_id"
+      - "await session_manager.invalidate_session"
+  
+  protected_endpoint:
+    queries:
+      - "async def protected_route principal: str = Depends(get_current_user)"
+      - "session_id = Depends(cookie_scheme)"
+
+session_features:
+  timeout_management:
+    queries:
+      - "session_timeout = 1800"
+      - "absolute_timeout = 43200"
+      - "SESSION_TIMEOUT timedelta"
+      - "max_age expires"
+  
+  activity_tracking:
+    queries:
+      - "last_activity datetime.utcnow"
+      - "created_at last_activity"
+      - "update_last_activity"
+  
+  secure_cookies:
+    queries:
+      - "httponly=True secure=True"
+      - "samesite=\"lax\" samesite=\"strict\""
+      - "set_cookie domain path"
+  
+  session_data:
+    queries:
+      - "session_data = {\"principal\":"
+      - "SessionData principal role"
+      - "json() parse_raw"
+
+storage_backends:
+  redis:
+    queries:
+      - "import redis.asyncio as redis"
+      - "await redis.from_url"
+      - "redis.setex redis.get redis.delete"
+      - "redis_client = redis.Redis"
+  
+  in_memory:
+    queries:
+      - "from cachetools import TTLCache"
+      - "sessions: Dict[str, SessionData]"
+      - "threading.Lock sessions"
+
+anti_patterns:
+  description: "Security anti-patterns to detect"
+  
+  predictable_tokens:
+    query: "session_id = str(uuid.uuid4()) -secrets"
+    severity: critical
+  
+  short_tokens:
+    query: "secrets.token_urlsafe(8) secrets.token_urlsafe(16)"
+    severity: high
+  
+  insecure_cookies:
+    query: "set_cookie -httponly -secure"
+    severity: critical
+  
+  no_timeout:
+    query: "set_cookie -max_age -expires"
+    severity: high
+  
+  weak_random:
+    query: "random.randint session_id"
+    severity: critical
+  
+  session_fixation:
+    query: "session_id = request.cookies.get -create_session"
+    severity: high
+
+filters:
+  language: python
+  file_extension: "\\.py$"
+  exclude_tests: true
+  exclude_forks: true
+  exclude_archived: true
+
+search_strategy:
+  steps:
+    - name: "Find Enforcer"
+      queries: ["APIKeyCookie", "APIKeyHeader"]
+      
+    - name: "Find Token Generator"
+      queries: ["secrets.token_urlsafe", "secrets.token_hex"]
+      
+    - name: "Find Session Storage"
+      queries: ["redis.setex session:", "TTLCache sessions"]
+      
+    - name: "Find Session Manager"
+      queries: ["class SessionManager", "create_session invalidate_session"]
+      
+    - name: "Verify Secure Implementation"
+      queries: ["httponly=True secure=True", "session_timeout"]
+
+best_practices:
+  token_generation:
+    queries:
+      - "secrets.token_urlsafe(32)"
+      - "secrets.token_urlsafe(64)"
+      - "token_bytes(32)"
+    description: "At least 128 bits (16 bytes) of entropy"
+  
+  cookie_security:
+    queries:
+      - "httponly=True"
+      - "secure=True"
+      - "samesite=\"lax\""
+      - "samesite=\"strict\""
+    description: "Secure cookie attributes"
+  
+  timeout_config:
+    queries:
+      - "session_timeout = 1800"
+      - "absolute_timeout ="
+      - "max_age ="
+    description: "Proper timeout configuration"
+  
+  session_regeneration:
+    queries:
+      - "invalidate_session create_session"
+      - "new_session_id = secrets"
+    description: "Session regeneration on privilege change"

@@ -1,0 +1,366 @@
+pattern:
+  name: "Session-Based Access Control"
+  id: "01_01_006"
+  description: "A subject is authenticated using a session identifier and authorized based on permissions associated with that session. Combines opaque token authentication with authorization"
+  
+dependencies:
+  - fastapi
+  - redis[asyncio]
+  - sqlalchemy
+  - pydantic
+  - secrets  # built-in
+
+roles:
+  authentication_enforcer:
+    description: "Ensures the session id provided by the Subject is verified before processing"
+    queries:
+      - query: "APIKeyCookie session_id Depends"
+        description: "Session-based authentication enforcement"
+        priority: high
+      
+      - query: "cookie_scheme = APIKeyCookie(name=\"session_id\")"
+        description: "Cookie scheme for sessions"
+        priority: high
+      
+      - query: "session_id: str = Depends(cookie_scheme)"
+        description: "Session dependency injection"
+        priority: high
+
+  verifier:
+    description: "Verifies whether the received session identifier corresponds to an open session"
+    queries:
+      - query: "session_manager.get_session HTTPException"
+        description: "Session verification with error handling"
+        priority: high
+      
+      - query: "async def verify_session session = await session_manager.get_session"
+        description: "Session verification function"
+        priority: high
+      
+      - query: "if session is None raise HTTPException 401"
+        description: "Invalid session handling"
+        priority: high
+
+  session_manager:
+    description: "Keeps track of open sessions with principal and permission data"
+    queries:
+      - query: "class SessionManager permissions role"
+        description: "Session manager with authorization data"
+        priority: high
+      
+      - query: "redis.setex session: SessionData.json"
+        description: "Session storage with permissions"
+        priority: high
+      
+      - query: "SessionData principal role permissions"
+        description: "Session data model with authorization"
+        priority: high
+      
+      - query: "async def create_session get_user_permissions"
+        description: "Session creation with permission retrieval"
+        priority: high
+      
+      - query: "session_data = SessionData(principal, role, permissions)"
+        description: "Session data initialization"
+        priority: medium
+
+  session_id_generator:
+    description: "Generates a new session id when requested"
+    queries:
+      - query: "secrets.token_urlsafe 32"
+        description: "Session ID generation (32 bytes)"
+        priority: high
+      
+      - query: "token = secrets.token_urlsafe"
+        description: "Token generation for session"
+        priority: medium
+
+  authorization_enforcer:
+    description: "Ensures the requested action is only executed if allowed by the authorization policy"
+    queries:
+      - query: "class AuthorizationChecker required_permissions"
+        description: "Authorization enforcement class"
+        priority: high
+      
+      - query: "def __call__ session_id required_permissions"
+        description: "Authorization checker callable"
+        priority: high
+      
+      - query: "async def __call__ session: SessionData = Depends"
+        description: "Authorization dependency with session"
+        priority: high
+      
+      - query: "require_permissions(permissions: List"
+        description: "Permission requirement factory"
+        priority: medium
+
+  decider:
+    description: "Verifies the Subject's access request against the authorization policy"
+    queries:
+      - query: "required_permissions.issubset session.permissions"
+        description: "Permission checking logic"
+        priority: high
+      
+      - query: "HTTPException 403 Missing permissions"
+        description: "Authorization denial"
+        priority: high
+      
+      - query: "missing_perms = set(required_permissions) - session.permissions"
+        description: "Missing permission calculation"
+        priority: high
+      
+      - query: "if session.role == Role.ADMIN"
+        description: "Role-based authorization"
+        priority: medium
+      
+      - query: "for permission in required_permissions"
+        description: "Permission iteration check"
+        priority: low
+
+  policy_provider:
+    description: "Keeps track of the applied authorization policy"
+    queries:
+      - query: "class PolicyProvider get_role_permissions"
+        description: "Policy management class"
+        priority: high
+      
+      - query: "role_permissions user_roles"
+        description: "Role-permission mapping"
+        priority: high
+      
+      - query: "db.query Role permissions"
+        description: "Database role queries"
+        priority: high
+      
+      - query: "def get_user_permissions(principal: str)"
+        description: "User permission retrieval"
+        priority: high
+      
+      - query: "self.role_permissions.get(role, set())"
+        description: "Permission set retrieval"
+        priority: medium
+      
+      - query: "Enum Permission READ WRITE DELETE"
+        description: "Permission enumeration"
+        priority: medium
+
+  registrar:
+    description: "Allows the Subject to open a new session through authentication"
+    queries:
+      - query: "create_session policy_provider.get_user_permissions"
+        description: "Session creation with permissions"
+        priority: high
+      
+      - query: "@app.post /login session_manager.create_session"
+        description: "Login endpoint with session creation"
+        priority: high
+      
+      - query: "authenticate_user create_session response.set_cookie"
+        description: "Authentication followed by session creation"
+        priority: high
+
+complete_implementation:
+  description: "Queries to find files with complete session-based access control implementation"
+  queries:
+    - query: "APIKeyCookie required_permissions session.permissions HTTPException 403 lang:python"
+      description: "Complete session-based access control pattern"
+      priority: critical
+      min_matches: 4
+    
+    - query: "class SessionManager class PolicyProvider get_role_permissions lang:python -file:test"
+      description: "Session manager with policy provider"
+      priority: high
+      min_matches: 3
+    
+    - query: "@app.post /login create_session get_user_permissions httponly lang:python"
+      description: "Login with permission-aware session creation"
+      priority: high
+      min_matches: 3
+
+endpoints:
+  login_with_authz:
+    queries:
+      - "@app.post /login session_manager.create_session policy_provider"
+      - "role = policy_provider.get_user_role"
+      - "permissions = policy_provider.get_user_permissions"
+  
+  protected_with_permissions:
+    queries:
+      - "session: SessionData = Depends(require_permissions"
+      - "async def protected_route Depends(AuthorizationChecker"
+      - "session: SessionData = Depends(check_permissions"
+  
+  role_based:
+    queries:
+      - "if session.role != Role.ADMIN"
+      - "session: SessionData Role.USER"
+  
+  logout:
+    queries:
+      - "@app.post /logout invalidate_session"
+      - "response.delete_cookie session_id"
+
+authorization_models:
+  permissions:
+    queries:
+      - "class Permission Enum"
+      - "Permission.READ Permission.WRITE Permission.DELETE"
+      - "Set[Permission]"
+  
+  roles:
+    queries:
+      - "class Role Enum"
+      - "Role.ADMIN Role.USER Role.GUEST"
+      - "user.role session.role"
+  
+  session_data:
+    queries:
+      - "class SessionData principal role permissions"
+      - "SessionData(principal=, role=, permissions=)"
+      - "session.permissions session.role"
+  
+  policy_mapping:
+    queries:
+      - "role_permissions: Dict[Role, Set[Permission]]"
+      - "user_roles: Dict[str, Role]"
+      - "get_role_permissions get_user_role"
+
+permission_checking:
+  subset_check:
+    queries:
+      - "required_permissions.issubset(session.permissions)"
+      - "set(required_permissions) <= session.permissions"
+  
+  individual_check:
+    queries:
+      - "if permission in session.permissions"
+      - "for perm in required_permissions"
+  
+  role_override:
+    queries:
+      - "if session.role == Role.ADMIN: return True"
+      - "is_admin = session.role == Role.ADMIN"
+  
+  missing_permissions:
+    queries:
+      - "missing = set(required_permissions) - session.permissions"
+      - "if missing_perms: raise HTTPException(403"
+
+advanced_authorization:
+  attribute_based:
+    queries:
+      - "class ABACDecider policy_function"
+      - "def policy_function(session: SessionData, context: Dict"
+      - "context.get(\"resource_owner\")"
+  
+  resource_ownership:
+    queries:
+      - "if session.principal == resource.owner"
+      - "resource_owner == session.principal"
+  
+  time_based:
+    queries:
+      - "datetime.now() working_hours"
+      - "if current_time.hour"
+  
+  location_based:
+    queries:
+      - "request.client.host allowed_ips"
+      - "session.ip_address"
+
+factories_and_helpers:
+  permission_factory:
+    queries:
+      - "def require_permissions(permissions: List[Permission])"
+      - "return AuthorizationChecker(required_permissions=permissions)"
+  
+  role_factory:
+    queries:
+      - "def require_role(role: Role)"
+      - "def admin_only()"
+  
+  combined_checker:
+    queries:
+      - "def require_auth_and_authz"
+      - "verify_credentials check_permissions"
+
+anti_patterns:
+  description: "Security anti-patterns to detect"
+  
+  authorization_bypass:
+    query: "if True: pass # TODO: implement authorization"
+    severity: critical
+  
+  permission_disabled:
+    query: "ENABLE_AUTHORIZATION = False"
+    severity: critical
+  
+  role_hardcoded:
+    query: "if username == \"admin\""
+    severity: high
+  
+  no_permission_check:
+    query: "@app.delete -required_permissions -Depends"
+    severity: high
+  
+  session_without_permissions:
+    query: "class SessionData principal -permissions -role"
+    severity: medium
+
+filters:
+  language: python
+  file_extension: "\\.py$"
+  exclude_tests: true
+  exclude_forks: true
+  exclude_archived: true
+
+search_strategy:
+  steps:
+    - name: "Find Authentication Enforcer"
+      queries: ["APIKeyCookie session_id"]
+      
+    - name: "Find Authorization Enforcer"
+      queries: ["class AuthorizationChecker", "require_permissions"]
+      
+    - name: "Find Session Manager"
+      queries: ["class SessionManager permissions role"]
+      
+    - name: "Find Policy Provider"
+      queries: ["class PolicyProvider", "get_role_permissions"]
+      
+    - name: "Find Permission Checking"
+      queries: ["required_permissions.issubset", "HTTPException 403"]
+      
+    - name: "Verify Complete Implementation"
+      queries: ["SessionData permissions HTTPException 403"]
+
+integration_patterns:
+  session_with_permissions:
+    queries:
+      - "session_data = SessionData(principal=username, role=role, permissions=perms)"
+      - "get_user_permissions principal"
+  
+  login_flow:
+    queries:
+      - "authenticate_user -> get_user_role -> get_user_permissions -> create_session"
+      - "@app.post /login authenticate_user policy_provider"
+  
+  protected_endpoint_flow:
+    queries:
+      - "verify_session -> check_permissions -> execute_action"
+      - "Depends(verify) Depends(authorize)"
+
+rbac_vs_abac:
+  rbac:
+    description: "Role-Based Access Control patterns"
+    queries:
+      - "role_permissions: Dict[Role, Set[Permission]]"
+      - "if session.role == Role.ADMIN"
+      - "get_role_permissions(role)"
+  
+  abac:
+    description: "Attribute-Based Access Control patterns"
+    queries:
+      - "policy_function(session: SessionData, context: Dict[str, Any])"
+      - "subject_attributes resource_attributes action_attributes"
+      - "evaluate_policy(subject, resource, action, environment)"
