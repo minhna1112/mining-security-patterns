@@ -40,6 +40,11 @@ class Pipeline:
             QueriesLoaderConfig.root_data_dir = args.root_data_dir
             QueriesLoaderConfig.repos_name_dir = os.path.join(args.root_data_dir, "dependent_repos_info")
             QueriesLoaderConfig.output_queries_dir = os.path.join(args.root_data_dir, "output_queries")
+
+
+        self.dependent_miner = dependent_miners.get((args.language.lower(), args.package_manager), None)(LibrariesIOConfig)
+        self.repo_crawler = GitCrawler(GitCrawlerConfig)
+
         if args.construct_queries and args.pattern:
             self.query_constructor = QueriesLoader(
                 language=args.language.lower(),
@@ -47,9 +52,6 @@ class Pipeline:
                 pattern=args.pattern,
                 config=QueriesLoaderConfig
             )
-
-        self.dependent_miner = dependent_miners.get((args.language.lower(), args.package_manager), None)(LibrariesIOConfig)
-        self.repo_crawler = GitCrawler(GitCrawlerConfig)
 
     def run(self, package_names: list[str]):
         if self.args.get_dependents:
@@ -90,8 +92,9 @@ class Pipeline:
                 file_path=os.path.join('./context/retriever/queries_library', self.query_constructor.yaml_path_postfix)
             )
             queries = self.query_constructor.load_queries()
-            output_file_path = os.path.join(QueriesLoaderConfig.output_queries_dir, f"{self.args.language}_{self.args.package_manager}_mutual_dependents.jsonl")
-            self.query_constructor.save_queries_to_file()
+            print(queries)
+            output_file_path = os.path.join(QueriesLoaderConfig.output_queries_dir, f"{self.args.pattern}_{self.args.web_framework}_queries.jsonl")
+            self.query_constructor.save_queries_to_file(output_file_path)
 
 if __name__ == "__main__":
     import argparse
