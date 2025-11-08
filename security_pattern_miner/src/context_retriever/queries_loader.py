@@ -1,7 +1,8 @@
 import yaml
 import jsonlines
-from ..config.constants import  GITHUB, FASTAPI
-from ..config.queries_loader import QueriesLoaderConfig
+import sys; sys.path.append("..")
+from config.constants import  GITHUB, FASTAPI
+from config.queries_loader import QueriesLoaderConfig
 from typing import List
 from  pydantic import BaseModel   
 import os
@@ -15,13 +16,11 @@ class Query(BaseModel):
 
 class QueriesLoader:
     def __init__(self, language: str, 
-                 package_manager: str,
                  web_framework: str = FASTAPI,
                  pattern: str = "",
                  config: QueriesLoaderConfig = QueriesLoaderConfig
                  ):
         self.language = language
-        self.package_manager = package_manager
         self.web_framework = web_framework
         self.yaml_path_postfix = f"{language}/{web_framework}/patterns/{pattern}.yaml"
         self.pattern = pattern
@@ -40,9 +39,10 @@ class QueriesLoader:
         with jsonlines.open(repo_meta_data_file_path, "r") as repo_data:
             for item in repo_data:
                 self.repo_names.append(f"{GITHUB}.com/{item.get('full_name')}")
+        # print(self.repo_names)
         return self.repo_names
 
-    def process_query(self, query: str, repo) -> str:
+    def process_query(self, query: str, repo : str) -> str:
         return " ".join([query, f"lang:{self.language}", f"r:{repo}"])
 
     def load_queries(self) -> List[Query]:
@@ -51,8 +51,8 @@ class QueriesLoader:
         repo_meta_data_file_path = os.path.join(self.config.repos_name_dir, repo_meta_data_file)
         for repo in self.load_repo_names(repo_meta_data_file_path= repo_meta_data_file_path):
             for role in self.load_roles():
-                for query in role.get("queries", []):
-                    self.queries.append(Query(repo=repo, role=role, query=self.process_query(query, repo), webframework=self.web_framework, pattern=self.pattern))
+                for query in self.metadata["roles"][role].get("queries", []):
+                    self.queries.append(Query(repo=repo, role=role, query=self.process_query(query['query'], repo), webframework=self.web_framework, pattern=self.pattern))
         return self.queries
     
     def save_queries_to_file(self, output_file_path: str):

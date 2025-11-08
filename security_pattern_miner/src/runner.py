@@ -22,33 +22,33 @@ class Pipeline:
         #     raise ValueError("Currently, only Python language with PyPI package manager is supported.")
         
         self.args = args
-        if args.max_pages:
-            LibrariesIOConfig.max_num_pages = args.max_pages
-        if args.per_page:
-            LibrariesIOConfig.max_per_page = args.per_page
-        if args.start_page:
-            LibrariesIOConfig.start_page = args.start_page
-        if args.start_index is not None:
-            GitCrawlerConfig.start_index = args.start_index
-        if args.end_index is not None:
-            GitCrawlerConfig.end_index = args.end_index
-        if args.root_data_dir:
-            LibrariesIOConfig.root_data_dir = args.root_data_dir
-            LibrariesIOConfig.dependent_repo_info_save_dir = os.path.join(args.root_data_dir, "dependent_repos_info")
-            GitCrawlerConfig.root_data_dir = args.root_data_dir
-            GitCrawlerConfig.cloned_repos_dir = os.path.join(args.root_data_dir, "cloned_repos")
-            QueriesLoaderConfig.root_data_dir = args.root_data_dir
-            QueriesLoaderConfig.repos_name_dir = os.path.join(args.root_data_dir, "dependent_repos_info")
-            QueriesLoaderConfig.output_queries_dir = os.path.join(args.root_data_dir, "output_queries")
+        if not args.construct_queries:
+            if args.max_pages:
+                LibrariesIOConfig.max_num_pages = args.max_pages
+            if args.per_page:
+                LibrariesIOConfig.max_per_page = args.per_page
+            if args.start_page:
+                LibrariesIOConfig.start_page = args.start_page
+            if args.start_index is not None:
+                GitCrawlerConfig.start_index = args.start_index
+            if args.end_index is not None:
+                GitCrawlerConfig.end_index = args.end_index
+            if args.root_data_dir:
+                LibrariesIOConfig.root_data_dir = args.root_data_dir
+                LibrariesIOConfig.dependent_repo_info_save_dir = os.path.join(args.root_data_dir, "dependent_repos_info")
+                GitCrawlerConfig.root_data_dir = args.root_data_dir
+                GitCrawlerConfig.cloned_repos_dir = os.path.join(args.root_data_dir, "cloned_repos")
+                QueriesLoaderConfig.root_data_dir = args.root_data_dir
+                QueriesLoaderConfig.repos_name_dir = os.path.join(args.root_data_dir, "dependent_repos_info")
+                QueriesLoaderConfig.output_queries_dir = os.path.join(args.root_data_dir, "output_queries")
 
 
-        self.dependent_miner = dependent_miners.get((args.language.lower(), args.package_manager), None)(LibrariesIOConfig)
-        self.repo_crawler = GitCrawler(GitCrawlerConfig)
+            self.dependent_miner = dependent_miners.get((args.language.lower(), args.package_manager), None)(LibrariesIOConfig)
+            self.repo_crawler = GitCrawler(GitCrawlerConfig)
 
         if args.construct_queries and args.pattern:
             self.query_constructor = QueriesLoader(
                 language=args.language.lower(),
-                package_manager=args.package_manager,
                 pattern=args.pattern,
                 config=QueriesLoaderConfig
             )
@@ -86,10 +86,12 @@ class Pipeline:
             # Step 4: Crawl and clone the dependent repositories
             self.repo_crawler.crawl_from_dependent_repos_info(dependent_repos)
             logger.info("Completed crawling and cloning dependent repositories")
-            
+
+
+    def construct_queries(self):
         if self.args.construct_queries:
             self.query_constructor.load_from_pattern_metadata_file(
-                file_path=os.path.join('./context/retriever/queries_library', self.query_constructor.yaml_path_postfix)
+                file_path=os.path.join('./context_retriever/queries_library', self.query_constructor.yaml_path_postfix)
             )
             queries = self.query_constructor.load_queries()
             print(queries)
@@ -124,7 +126,8 @@ if __name__ == "__main__":
     
     
     
-    # pipeline = Pipeline(args)
+    pipeline = Pipeline(args)
+    pipeline.construct_queries()
     # # print(args.package_names)
     # pipeline.run(args.package_names)
     # python_dependent_miner.get_dependents("flask")
@@ -151,3 +154,4 @@ if __name__ == "__main__":
     # git_crawler = GitCrawler()
     # dependent_repos = git_crawler.load_dependedent_repos_info(saved_jsonl_path)
     # git_crawler.crawl_from_dependent_repos_info(dependent_repos)
+    
