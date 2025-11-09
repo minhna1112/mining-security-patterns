@@ -4,3 +4,4 @@ requests
 jsonlines
 tqdm
 GitPython
+pyYAML
