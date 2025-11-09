@@ -9,7 +9,9 @@ from config.constants import PYTHON, PYPI, JAVA, MAVEN
 from config.crawler import GitCrawlerConfig
 from config.libraries_io import LibrariesIOConfig
 from config.queries_loader import QueriesLoaderConfig
+from config.zoekt import ZoektConfig
 from context_retriever.queries_loader import QueriesLoader
+from context_retriever.zoekt_retriever import ZoektSearchRequester
 
 dependent_miners = {
     (PYTHON, PYPI): PythonDependentMiner,
@@ -80,7 +82,7 @@ class SecurityPatternMiner:
 
 
 class SecurityPatternExtractor:
-    """Handles construction of security pattern queries"""
+    """Handles construction of security pattern queries and retrieval of contexts using Zoekt"""
     def __init__(self, args):
         self.args = args
         
@@ -89,6 +91,12 @@ class SecurityPatternExtractor:
             QueriesLoaderConfig.root_data_dir = args.root_data_dir
             QueriesLoaderConfig.repos_name_dir = os.path.join(args.root_data_dir, "dependent_repos_info")
             QueriesLoaderConfig.output_queries_dir = os.path.join(args.root_data_dir, "output_queries")
+            ZoektConfig.root_data_dir = args.root_data_dir
+            ZoektConfig.cloned_repos_dir = os.path.join(args.root_data_dir, "cloned_repos")
+            ZoektConfig.search_results_dir = os.path.join(args.root_data_dir, "search_results")
+
+        if args.zoekt_url:
+            ZoektConfig.zoekt_url = args.zoekt_url
 
         if not args.pattern:
             raise ValueError("Pattern is required for query construction")
@@ -96,15 +104,20 @@ class SecurityPatternExtractor:
         self.query_constructor = QueriesLoader(
             language=args.language.lower(),
             pattern=args.pattern,
+            web_framework=args.web_framework,
             config=QueriesLoaderConfig
         )
+        
+        # Initialize Zoekt searcher if search is enabled
+        if args.search_queries:
+            self.zoekt_searcher = ZoektSearchRequester(ZoektConfig)
 
     def construct_queries(self):
         self.query_constructor.load_from_pattern_metadata_file(
             file_path=os.path.join('./context_retriever/queries_library', self.query_constructor.yaml_path_postfix)
         )
         queries = self.query_constructor.load_queries()
-        print(queries)
+        logger.info(f"Loaded {len(queries)} queries for pattern {self.args.pattern}")
         
         # Ensure output directory exists
         os.makedirs(QueriesLoaderConfig.output_queries_dir, exist_ok=True)
@@ -112,6 +125,41 @@ class SecurityPatternExtractor:
         output_file_path = os.path.join(QueriesLoaderConfig.output_queries_dir, f"{self.args.pattern}_{self.args.web_framework}_queries.jsonl")
         self.query_constructor.save_queries_to_file(output_file_path)
         logger.info(f"Queries saved to {output_file_path}")
+        
+        return queries
+
+    def search_and_save_results(self, queries):
+        """Search queries using Zoekt and save results"""
+        if not hasattr(self, 'zoekt_searcher'):
+            logger.error("Zoekt searcher not initialized. Use --search_queries flag.")
+            return
+            
+        # Ensure search results directory exists
+        os.makedirs(ZoektConfig.search_results_dir, exist_ok=True)
+        
+        search_results_file = os.path.join(
+            ZoektConfig.search_results_dir, 
+            f"{self.args.pattern}_{self.args.web_framework}_search_results.jsonl"
+        )
+        
+        logger.info(f"Starting search for {len(queries)} queries using Zoekt at {ZoektConfig.zoekt_url}")
+        search_results = self.zoekt_searcher.search_queries_and_save(queries, search_results_file)
+        
+        # Log summary statistics
+        successful_searches = sum(1 for result in search_results if result.success)
+        total_contexts = sum(len(result.contexts) for result in search_results)
+        
+        logger.info(f"Search completed: {successful_searches}/{len(queries)} queries successful, {total_contexts} total contexts found")
+        logger.info(f"Search results saved to {search_results_file}")
+
+    def run(self):
+        """Main execution method for the extractor"""
+        # Step 1: Construct queries
+        queries = self.construct_queries()
+        
+        # Step 2: Search queries if enabled
+        if self.args.search_queries:
+            self.search_and_save_results(queries)
 
 
 def create_miner_parser():
@@ -142,10 +190,12 @@ def create_extractor_parser():
     parser = argparse.ArgumentParser(description="Extract security pattern queries")
     
     parser.add_argument("--construct_queries", action="store_true", help="Flag to construct queries based on the specified pattern")
+    parser.add_argument("--search_queries", action="store_true", help="Flag to search constructed queries using Zoekt")
     parser.add_argument("--pattern", type=str, required=True, help="Security pattern name for query construction")
     parser.add_argument("--web_framework", type=str, default="fastapi", help="Web framework name for query construction")
     parser.add_argument("--language", type=str, default=PYTHON, help="Programming language")
     parser.add_argument("--root_data_dir", type=str, default="/data", help="Directory to save query outputs")
+    parser.add_argument("--zoekt_url", type=str, help="Zoekt search API URL (overrides environment variable)")
     
     return parser
 
@@ -169,7 +219,7 @@ if __name__ == "__main__":
         args = parser.parse_args()
         
         extractor = SecurityPatternExtractor(args)
-        extractor.construct_queries()
+        extractor.run()
         
     else:
         print("Error: Please specify either mining arguments (--get_dependents, --crawl_only, --clean_only) or extraction arguments (--construct_queries)")

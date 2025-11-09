@@ -15,4 +15,4 @@ OPAQUE_TOKEN_AUTHENTICATION = "opaque_token_authentication"
 OBSCURE_TOKEN_ACCESS_CONTROL = "obscure_token_access_control"
 SESSION_BASED_ACCESS_CONTROL = "session_based_access_control"
 
-
+NUM_CONTEXT_LINES = 20

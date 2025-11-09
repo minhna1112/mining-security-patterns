@@ -139,34 +139,102 @@ class ZoektSearchRequester:
         # This should never be reached, but just in case
         return {"Result": {"Files": [], "FileCount": 0}}
 
-    def handle_file_path( filepath: str) -> str:
-        project_metadata,  navigation_path = filepath.split(":", 1)
+    @staticmethod
+    def handle_file_path(filepath: str) -> str:
+        project_metadata, navigation_path = filepath.split(":", 1)
         project_metadata = project_metadata.replace("/", "_").replace("github.com_", "")
         return os.path.join(project_metadata, navigation_path)
+
     def post_process_search_results(
             self,
             files: list,
             query_point: Query) -> SearchedResponse:
-        searched_response = SearchedResponse()
-        searched_response.query = query_point.query
-        searched_response.success = False
+        searched_response = SearchedResponse(
+            repo=query_point.repo,
+            role=query_point.role,
+            query=query_point.query,
+            webframework=query_point.webframework,
+            pattern=query_point.pattern,
+            success=False,
+            contexts=[]
+        )
         contexts = []
         for file in files:
             if "LineMatches" in file:
                 line_matches = file["LineMatches"]
                 for line_match in line_matches:
-                    context = Context()
+                    print(line_match)
+                    context = Context(
+                        filepath="",
+                        start_line=0,
+                        end_line=0,
+                        snippet=""
+                    )
                     context.filepath = file.get("FileName", "")
-                    context.start_line = max(0, line_match['LineNumber'] - self.config.num_context_lines - 1)
-                    context.end_line = line_match['LineNumber'] + self.config.num_context_lines
+                    context.start_line = line_match['LineStart']
+                    context.end_line = line_match['LineEnd']
                     if self.config.get_whole_file:
-                        with open(os.path.join(self.config.cloned_repos_dir, context.filepath), 'r') as f:
-                            context.snippet = f.read()
+                        # try:
+                            processed_filepath = self.handle_file_path(context.filepath)
+                            full_path = os.path.join(self.config.cloned_repos_dir, processed_filepath)
+                            with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                context.snippet = f.read()
+                        # except Exception as e:
+                        #     logger.error(f"Error reading file {context.filepath}: {e}")
+                        #     context.snippet = decodebytes(line_match['Content'].encode()).decode('utf-8', errors='ignore')
                     else:
-                        context.snippet = decodebytes(line_match['Context'].encode()).decode('utf-8', errors='ignore')
+                        before, current, after = line_match['Before'], line_match['Line'], line_match['After']
+                        context.snippet = decodebytes((before + current + after).encode()).decode('utf-8', errors='ignore')
                     contexts.append(context)
         if contexts:
             searched_response.success = True
         searched_response.contexts = contexts
         return searched_response
-    
+
+    def save_search_results_to_file(self, search_results: List[SearchedResponse], output_file_path: str):
+        """
+        Save processed search results to a JSONL file.
+        
+        Args:
+            search_results: List of SearchedResponse objects
+            output_file_path: Path to the output JSONL file
+        """
+        import jsonlines
+        
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
+        
+        with jsonlines.open(output_file_path, "w") as writer:
+            for result in search_results:
+                writer.write(result.dict())
+        
+        logger.info(f"Saved {len(search_results)} search results to {output_file_path}")
+
+    def search_queries_and_save(self, queries: List[Query], output_file_path: str):
+        """
+        Search all queries using Zoekt and save results to file.
+        
+        Args:
+            queries: List of Query objects to search
+            output_file_path: Path to save the search results
+        """
+        search_results = []
+        
+        logger.info(f"Starting search for {len(queries)} queries")
+        
+        for i, query in enumerate(queries):
+            logger.info(f"Processing query {i+1}/{len(queries)}: {query.query[:100]}...")
+            
+            files = self.zoekt_search_on_query_point(query)
+            searched_response = self.post_process_search_results(files, query)
+            search_results.append(searched_response)
+            
+            # Log progress
+            if searched_response.success:
+                logger.info(f"Query {i+1} successful: found {len(searched_response.contexts)} contexts")
+            else:
+                logger.info(f"Query {i+1} returned no results")
+        
+        # Save all results
+        self.save_search_results_to_file(search_results, output_file_path)
+        return search_results
