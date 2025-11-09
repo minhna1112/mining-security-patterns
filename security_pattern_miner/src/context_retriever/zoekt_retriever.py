@@ -1,4 +1,9 @@
-import sys; sys.path.append("..")
+import os
+import sys
+
+sys.path.append("..")
+from typing import List
+from pydantic import BaseModel
 from config.zoekt import ZoektConfig
 from context_retriever.queries_loader import Query
 import requests
@@ -7,8 +12,19 @@ from requests.exceptions import ConnectionError, Timeout , RequestException
 import  json
 import time
 from logging import getLogger
-
+from typing import List
+from base64 import decodebytes
 logger = getLogger(__name__)
+
+class Context(BaseModel):
+    filepath: str
+    start_line: int
+    end_line: int
+    snippet: str
+
+class SearchedResponse(Query):
+    success: bool
+    contexts: List[Context] = []
 
 class ZoektSearchRequester:
     """
@@ -17,8 +33,6 @@ class ZoektSearchRequester:
 
     def __init__(self, config: ZoektConfig):
         self.config = config
-        self.num_successful_searches = 0
-        self.num_failed_searches = 0
 
     def zoekt_search_on_query_point(
             self,
@@ -29,11 +43,10 @@ class ZoektSearchRequester:
             files = result["Result"]["Files"]
             if files:
                 logger.info(f"Found {len(files)} files for query: {query}")
-                self.num_successful_searches += 1
-                return result
-        count += 1
-        self.num_failed_searches += 1
-        return {"Result": {"Files": [], "FileCount": 0}}
+                return files
+        # count += 1
+        # self.num_failed_searches += 1
+        return []
     
     def zoekt_search_request(
                         self,
@@ -126,5 +139,34 @@ class ZoektSearchRequester:
         # This should never be reached, but just in case
         return {"Result": {"Files": [], "FileCount": 0}}
 
-
+    def handle_file_path( filepath: str) -> str:
+        project_metadata,  navigation_path = filepath.split(":", 1)
+        project_metadata = project_metadata.replace("/", "_").replace("github.com_", "")
+        return os.path.join(project_metadata, navigation_path)
+    def post_process_search_results(
+            self,
+            files: list,
+            query_point: Query) -> SearchedResponse:
+        searched_response = SearchedResponse()
+        searched_response.query = query_point.query
+        searched_response.success = False
+        contexts = []
+        for file in files:
+            if "LineMatches" in file:
+                line_matches = file["LineMatches"]
+                for line_match in line_matches:
+                    context = Context()
+                    context.filepath = file.get("FileName", "")
+                    context.start_line = max(0, line_match['LineNumber'] - self.config.num_context_lines - 1)
+                    context.end_line = line_match['LineNumber'] + self.config.num_context_lines
+                    if self.config.get_whole_file:
+                        with open(os.path.join(self.config.cloned_repos_dir, context.filepath), 'r') as f:
+                            context.snippet = f.read()
+                    else:
+                        context.snippet = decodebytes(line_match['Context'].encode()).decode('utf-8', errors='ignore')
+                    contexts.append(context)
+        if contexts:
+            searched_response.success = True
+        searched_response.contexts = contexts
+        return searched_response
     

@@ -13,3 +13,7 @@ class ZoektConfig():
     retry_delay: float = os.getenv('RETRY_DELAY', 0.2)
     zoekt_url: str = os.getenv('ZOEKT_URL', 'http://localhost:6070/api/search')
     max_candidates_used: int = os.getenv('MAX_CANDIDATES_USED', 10)
+    top_k_files: int = os.getenv('TOP_K_FILES', 5)
+    get_whole_file: bool = os.getenv('GET_WHOLE_FILE', False)
+    root_data_dir: str = os.getenv('ROOT_DATA_DIR', '/data')
+    cloned_repos_dir: str = os.path.join(root_data_dir, 'cloned_repos')
