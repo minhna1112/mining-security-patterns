@@ -27,7 +27,11 @@ services:
       - ./build/volumes/data:/data
     env_file:
       - ./.env
-    command: ["python", "./runner.py", "--construct_queries", "--pattern", "password_based_authentication", "--web_framework", "fastapi", "--language", "python", "--root_data_dir=/data"]
+    environment:
+      - ZOEKT_URL=http://zoekt-webserver:6070/api/search
+    command: ["python", "./runner.py", "--construct_queries", "--search_queries", "--pattern", "password_based_authentication", "--web_framework", "fastapi", "--language", "python", "--root_data_dir=/data"]
+    depends_on:
+      - zoekt-webserver
     deploy:
       resources:
         limits:
