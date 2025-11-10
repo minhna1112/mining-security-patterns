@@ -25,7 +25,45 @@ class LibrariesIODependentMiner(DependentMiner):
         self.language = language
         self.config = config
 
+    def has_cleaned_dependents_file(self, package_name: str) -> bool:
+        """
+        Check if a cleaned dependents file already exists for the package.
+        
+        Args:
+            package_name: Name of the package to check
+            
+        Returns:
+            True if cleaned file exists, False otherwise
+        """
+        import os
+        if not os.path.exists(self.config.dependent_repo_info_save_dir):
+            return False
+        
+        cleaned_file_path = os.path.join(
+            self.config.dependent_repo_info_save_dir, 
+            f"{self.language}_{self.package_manager}_{package_name}_dependents_{self.config.start_page}_cleaned.jsonl"
+        )
+        
+        exists = os.path.exists(cleaned_file_path)
+        if exists:
+            # Also check if file is not empty
+            try:
+                with open(cleaned_file_path, 'r') as f:
+                    first_line = f.readline()
+                    return bool(first_line.strip())
+            except Exception:
+                return False
+        return False
+
     def get_dependents(self, package_name: str) -> List[DependentRepositoryInfo]:
+        # Check if cleaned file already exists
+        if self.has_cleaned_dependents_file(package_name):
+            logger.info(f"Cleaned dependents file already exists for package {package_name}. Skipping API fetch.")
+            logger.info(f"To re-fetch, delete the file or use --clean_only to reprocess existing raw files.")
+            return self.load_saved_dependents(package_name)
+        
+        logger.info(f"No cleaned dependents file found for {package_name}. Fetching from Libraries.io API...")
+        
         num_pages = self.config.start_page
         dependents = []
         while num_pages <= self.config.start_page + self.config.max_num_pages:
@@ -144,17 +182,35 @@ class LibrariesIODependentMiner(DependentMiner):
         # Remove duplicated JSON line (dependent ) in previously saved dependents file if exists
         import os
         if not os.path.exists(self.config.dependent_repo_info_save_dir):
+            logger.warning(f"Dependent repo info directory does not exist: {self.config.dependent_repo_info_save_dir}")
             return
-        file_path = os.path.join(LibrariesIOConfig.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_{LibrariesIOConfig.start_page}.jsonl")
-        cleaned_file_path = os.path.join(LibrariesIOConfig.dependent_repo_info_save_dir, f"{self.language}_{self.package_manager}_{package_name}_dependents_{LibrariesIOConfig.start_page}_cleaned.jsonl")
+        
+        file_path = os.path.join(
+            LibrariesIOConfig.dependent_repo_info_save_dir, 
+            f"{self.language}_{self.package_manager}_{package_name}_dependents_{LibrariesIOConfig.start_page}.jsonl"
+        )
+        cleaned_file_path = os.path.join(
+            LibrariesIOConfig.dependent_repo_info_save_dir, 
+            f"{self.language}_{self.package_manager}_{package_name}_dependents_{LibrariesIOConfig.start_page}_cleaned.jsonl"
+        )
+        
         if not os.path.exists(file_path):
+            logger.warning(f"Raw dependents file not found: {file_path}")
+            # Check if cleaned file already exists
+            if os.path.exists(cleaned_file_path):
+                logger.info(f"Cleaned file already exists: {cleaned_file_path}")
             return
+        
+        logger.info(f"Cleaning dependents file for package {package_name}...")
         unique_dependents = {}
         with jsonlines.open(file_path, "r") as f:
             for dep in f:
                 unique_dependents[dep['full_name']] = dep
+        
         with jsonlines.open(cleaned_file_path, "w") as f:
             f.write_all(unique_dependents.values())
+        
+        logger.info(f"Cleaned {len(unique_dependents)} unique dependents from {file_path} to {cleaned_file_path}")
     
     def load_saved_dependents(self, package_name: str) -> List[DependentRepositoryInfo]:
         import os
