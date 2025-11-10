@@ -49,18 +49,33 @@ class SecurityPatternMiner:
     def run(self, package_names: list[str]):
         if self.args.get_dependents:
             # Step 0: Get each package's dependents and save to files
+            logger.info(f"Starting dependent mining for packages: {', '.join(package_names)}")
+            
             for pkg in package_names:
-                self.dependent_miner.get_dependents(pkg)
-                self.dependent_miner.clean_saved_dependents(pkg)
+                logger.info(f"\n{'='*60}")
+                logger.info(f"Processing package: {pkg}")
+                logger.info(f"{'='*60}")
+                
+                # Check if cleaned file exists
+                if self.dependent_miner.has_cleaned_dependents_file(pkg):
+                    logger.info(f"✓ Package {pkg} already has cleaned dependents file")
+                    logger.info(f"  Skipping API fetch. File will be used for mutual dependents calculation.")
+                else:
+                    logger.info(f"✗ Package {pkg} needs to fetch dependents from Libraries.io API")
+                    self.dependent_miner.get_dependents(pkg)
+                    self.dependent_miner.clean_saved_dependents(pkg)
+                    logger.info(f"✓ Completed fetching and cleaning dependents for {pkg}")
             
             if len(package_names) < 2:
                 logger.warning("At least two package names are required to find mutual dependents. Stopping")
                 return
         
         if self.args.clean_only:
-            logger.info("Cleaned saved dependents files. Stopping as --clean_only is set.")
+            logger.info("Running in clean-only mode...")
             for pkg in package_names:
+                logger.info(f"Cleaning dependents for package: {pkg}")
                 self.dependent_miner.clean_saved_dependents(pkg)
+            logger.info("Cleaned saved dependents files. Stopping as --clean_only is set.")
             return  
         
         if self.args.crawl_only:

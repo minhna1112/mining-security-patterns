@@ -8,48 +8,42 @@ dependencies:
   - python-jose[cryptography]
   - PyJWT
   - cryptography
-  - redis  # optional, for token revocation
+
+repo_metadata_file:
+ - python_Pypi_mutual_dependents_fastapi_pyjwt.jsonl
+
 
 roles:
   enforcer:
     description: "Ensures the requested action is only performed if the Subject is successfully authenticated"
     queries:
-      - query: "HTTPBearer OAuth2PasswordBearer"
+      - query: "HTTPBearer Depends"
         description: "Bearer token enforcement"
         priority: high
-      
-      - query: "HTTPAuthorizationCredentials Depends"
+      - query: " Depends OAuth2PasswordBearer"
         description: "HTTP authorization credentials dependency"
-        priority: high
-      
-      - query: "security = HTTPBearer()"
-        description: "HTTPBearer security scheme initialization"
-        priority: high
-      
-      - query: "credentials: HTTPAuthorizationCredentials = Depends(security)"
-        description: "Bearer token dependency injection"
         priority: high
 
   verifier:
     description: "Manages the verification of whether a token is valid"
     queries:
-      - query: "jwt.decode SECRET_KEY algorithms"
+      - query: "jwt decode SECRET_KEY algorithms"
         description: "JWT token verification"
         priority: high
       
-      - query: "def verify_token jwt.decode"
+      - query: "def verify_token jwt decode"
         description: "Token verification functions"
         priority: high
-      
-      - query: "jwt.decode(token, SECRET_KEY, algorithms"
+
+      - query: "jwt decode token, SECRET_KEY, algorithms"
         description: "Direct JWT decode calls"
         priority: high
-      
-      - query: "payload = jwt.decode JWTError"
+
+      - query: "payload jwt decode JWTError"
         description: "JWT decode with error handling"
         priority: high
       
-      - query: "credentials.credentials jwt.decode"
+      - query: "credentials jwt decode"
         description: "Extracting and verifying JWT from credentials"
         priority: medium
 
@@ -64,11 +58,11 @@ roles:
         description: "Python-jose JWT import"
         priority: high
       
-      - query: "algorithm = \"HS256\" jwt.encode"
+      - query: "algorithm HS256 jwt.encode"
         description: "HMAC algorithm configuration"
         priority: high
       
-      - query: "jwt.encode jwt.decode HS256"
+      - query: "jwt encode decode HS256"
         description: "Complete HMAC JWT operations"
         priority: medium
 
@@ -83,7 +77,7 @@ roles:
         description: "JWT verification with public key"
         priority: high
       
-      - query: "algorithm = \"RS256\" jwt"
+      - query: "algorithm RS256 jwt"
         description: "RSA signature algorithm configuration"
         priority: high
       
@@ -98,7 +92,7 @@ roles:
         description: "Secret key from environment"
         priority: high
       
-      - query: "SECRET_KEY ALGORITHM = \"HS256\""
+      - query: "SECRET_KEY ALGORITHM HS256 "
         description: "HMAC key and algorithm configuration"
         priority: high
       
@@ -117,53 +111,53 @@ roles:
         description: "RSA key management imports"
         priority: high
       
-      - query: "private_key.public_key() serialization"
+      - query: "private_key public_key serialization"
         description: "Public key extraction and serialization"
         priority: high
       
-      - query: "serialization.PrivateFormat.PKCS8"
+      - query: "serialization PrivateFormat PKCS8"
         description: "Private key serialization"
         priority: medium
       
-      - query: "serialization.PublicFormat.SubjectPublicKeyInfo"
+      - query: "serialization PublicFormat SubjectPublicKeyInfo"
         description: "Public key serialization"
         priority: medium
 
   token_generator:
     description: "Manages the generation of new tokens"
     queries:
-      - query: "def create_access_token jwt.encode"
+      - query: "def create_access_token jwt encode"
         description: "Access token creation functions"
         priority: high
       
-      - query: "jwt.encode exp sub"
+      - query: "jwt encode exp sub"
         description: "JWT encoding with expiration and subject"
         priority: high
       
-      - query: "create_access_token data: dict expires_delta"
+      - query: "create_access_token data dict expires_delta"
         description: "Token creation with expiration parameter"
         priority: high
       
-      - query: "timedelta(minutes jwt.encode"
+      - query: "timedelta minutes jwt encode"
         description: "Token expiration time calculation"
         priority: medium
       
-      - query: "datetime.utcnow() + expires_delta"
+      - query: "datetime.utcnow expires_delta"
         description: "Expiration timestamp calculation"
         priority: low
 
   registrar:
     description: "Provides the Subject a token after successful authentication"
     queries:
-      - query: "@app.post /token create_access_token"
+      - query: "app post token create_access_token"
         description: "Token issuance endpoints"
         priority: high
       
-      - query: "return access_token token_type bearer"
+      - query: "return access token token_type bearer"
         description: "Token response formatting"
         priority: high
       
-      - query: "@app.post /login jwt.encode"
+      - query: "app post login jwt.encode"
         description: "Login endpoint with JWT generation"
         priority: high
       
@@ -174,11 +168,11 @@ roles:
   token_blacklist:
     description: "Tracks revoked but not yet expired tokens (optional feature)"
     queries:
-      - query: "redis.sadd revoked_tokens jwt"
+      - query: "redis sadd revoked_tokens jwt"
         description: "Token revocation with Redis"
         priority: medium
       
-      - query: "blacklist.revoke token"
+      - query: "blacklist revoke token"
         description: "Token blacklist management"
         priority: medium
       
@@ -190,23 +184,6 @@ roles:
         description: "Revocation checking"
         priority: low
 
-complete_implementation:
-  description: "Queries to find files with complete JWT authentication implementation"
-  queries:
-    - query: "HTTPBearer jwt.encode jwt.decode SECRET_KEY lang:python"
-      description: "Complete JWT authentication pattern"
-      priority: critical
-      min_matches: 4
-    
-    - query: "create_access_token jwt.encode exp sub lang:python -file:test"
-      description: "Token generation with proper claims"
-      priority: high
-      min_matches: 3
-    
-    - query: "@app.post /token authenticate_user jwt.encode lang:python"
-      description: "Token endpoint with authentication"
-      priority: high
-      min_matches: 3
 
 endpoints:
   token_issuance:
@@ -251,62 +228,4 @@ token_features:
         - "RS384"
         - "RS512"
 
-anti_patterns:
-  description: "Security anti-patterns to detect"
-  
-  weak_algorithm:
-    query: "algorithm = \"none\" jwt.encode"
-    severity: critical
-  
-  missing_expiration:
-    query: "jwt.encode -exp -expires"
-    severity: high
-  
-  hardcoded_secret:
-    query: "SECRET_KEY = \"my-secret-key\""
-    severity: critical
-  
-  weak_secret:
-    query: "SECRET_KEY = \"secret\" \"test\""
-    severity: critical
-  
-  no_algorithm_verification:
-    query: "jwt.decode -algorithms verify_signature=False"
-    severity: critical
 
-filters:
-  language: python
-  file_extension: "\\.py$"
-  exclude_tests: true
-  exclude_forks: true
-  exclude_archived: true
-
-search_strategy:
-  steps:
-    - name: "Find Enforcer"
-      queries: ["HTTPBearer", "OAuth2PasswordBearer"]
-      
-    - name: "Find Token Generator"
-      queries: ["create_access_token", "jwt.encode"]
-      
-    - name: "Find Verifier"
-      queries: ["jwt.decode", "verify_token"]
-      
-    - name: "Find Key Management"
-      queries: ["SECRET_KEY", "rsa.generate_private_key"]
-      
-    - name: "Verify Complete Implementation"
-      queries: ["HTTPBearer jwt.encode jwt.decode"]
-
-library_alternatives:
-  jwt_libraries:
-    - name: python-jose
-      queries:
-        - "from jose import jwt"
-        - "from jose import JWTError"
-    
-    - name: PyJWT
-      queries:
-        - "import jwt"
-        - "import jwt as PyJWT"
-        - "from jwt import encode, decode"
