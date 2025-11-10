@@ -297,63 +297,7 @@ sensitive_actions:
       description: "Password change not accessible via API key"
       priority: high
 
-anti_patterns:
-  description: "Security anti-patterns to detect"
-  
-  plaintext_storage:
-    query: "Column String api_key -hash -token_hash"
-    severity: critical
-  
-  weak_tokens:
-    query: "secrets.token_urlsafe(8) secrets.token_urlsafe(16)"
-    severity: critical
-  
-  no_hashing:
-    query: "api_key = secrets.token db.add -hash"
-    severity: critical
-  
-  predictable_tokens:
-    query: "uuid.uuid4() random.randint -secrets"
-    severity: critical
-  
-  no_expiration:
-    query: "class APIKey -expires_at -expiration"
-    severity: medium
-  
-  overprivileged_keys:
-    query: "permissions = [\"*\"] permissions = [\"all\"]"
-    severity: high
-  
-  api_key_for_sensitive:
-    query: "@app.delete /account api_key APIKeyHeader"
-    severity: high
 
-filters:
-  language: python
-  file_extension: "\\.py$"
-  exclude_tests: true
-  exclude_forks: true
-  exclude_archived: true
-
-search_strategy:
-  steps:
-    - name: "Find Enforcer"
-      queries: ["APIKeyHeader", "APIKeyQuery", "X-API-Key"]
-      
-    - name: "Find Token Generator"
-      queries: ["secrets.token_urlsafe", "secrets.token_hex"]
-      
-    - name: "Find Hasher"
-      queries: ["hashlib.sha256", "hash_token"]
-      
-    - name: "Find Token Manager"
-      queries: ["class APIKey", "token_hash principal permissions"]
-      
-    - name: "Find Validator"
-      queries: ["validate_token", "APIKeyValidator"]
-      
-    - name: "Verify Security"
-      queries: ["hashlib secrets db.query", "httponly=False secure=False"]
 
 best_practices:
   token_generation:

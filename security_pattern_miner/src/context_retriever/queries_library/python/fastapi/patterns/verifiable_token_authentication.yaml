@@ -22,11 +22,11 @@ roles:
         description: "HTTP authorization credentials dependency"
         priority: high
       
-      - query: "security = HTTPBearer()"
+      - query: "security = HTTPBearer"
         description: "HTTPBearer security scheme initialization"
         priority: high
-      
-      - query: "credentials: HTTPAuthorizationCredentials = Depends(security)"
+
+      - query: "credentials  HTTPAuthorizationCredentials = Depends security"
         description: "Bearer token dependency injection"
         priority: high
 
@@ -41,7 +41,7 @@ roles:
         description: "Token verification functions"
         priority: high
       
-      - query: "jwt.decode(token, SECRET_KEY, algorithms"
+      - query: "jwt.decode token, SECRET_KEY, algorithms"
         description: "Direct JWT decode calls"
         priority: high
       
@@ -251,62 +251,4 @@ token_features:
         - "RS384"
         - "RS512"
 
-anti_patterns:
-  description: "Security anti-patterns to detect"
-  
-  weak_algorithm:
-    query: "algorithm = \"none\" jwt.encode"
-    severity: critical
-  
-  missing_expiration:
-    query: "jwt.encode -exp -expires"
-    severity: high
-  
-  hardcoded_secret:
-    query: "SECRET_KEY = \"my-secret-key\""
-    severity: critical
-  
-  weak_secret:
-    query: "SECRET_KEY = \"secret\" \"test\""
-    severity: critical
-  
-  no_algorithm_verification:
-    query: "jwt.decode -algorithms verify_signature=False"
-    severity: critical
 
-filters:
-  language: python
-  file_extension: "\\.py$"
-  exclude_tests: true
-  exclude_forks: true
-  exclude_archived: true
-
-search_strategy:
-  steps:
-    - name: "Find Enforcer"
-      queries: ["HTTPBearer", "OAuth2PasswordBearer"]
-      
-    - name: "Find Token Generator"
-      queries: ["create_access_token", "jwt.encode"]
-      
-    - name: "Find Verifier"
-      queries: ["jwt.decode", "verify_token"]
-      
-    - name: "Find Key Management"
-      queries: ["SECRET_KEY", "rsa.generate_private_key"]
-      
-    - name: "Verify Complete Implementation"
-      queries: ["HTTPBearer jwt.encode jwt.decode"]
-
-library_alternatives:
-  jwt_libraries:
-    - name: python-jose
-      queries:
-        - "from jose import jwt"
-        - "from jose import JWTError"
-    
-    - name: PyJWT
-      queries:
-        - "import jwt"
-        - "import jwt as PyJWT"
-        - "from jwt import encode, decode"
