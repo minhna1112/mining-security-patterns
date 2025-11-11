@@ -1,0 +1,21 @@
+{
+  "repo": "GitHub repository identifier",
+  "role": "Security pattern role being searched 
+           (e.g., verification_manager, token_generator)",
+  "query": "Zoekt search query used to find the pattern",
+  "webframework": "Web framework used in the repository 
+                   (e.g., fastapi, django)",
+  "pattern": "Security pattern name being detected 
+              (e.g., password_based_authentication)",
+  "success": "Boolean indicating if pattern 
+              implementation was found",
+  "contexts": [
+    {
+      "filepath": "Path to file containing the role implemented",
+      "start_line": "Starting line number of code snippet",
+      "end_line": "Ending line number of code snippet",
+      "snippet": "Actual code content showing pattern 
+                  implementation"
+    }
+  ]
+}
