@@ -8,7 +8,7 @@ services:
       - ./build/volumes/data:/data
     env_file:
       - ./.env
-    command: ["python", "./runner.py", "--get_dependents", "--package_names", "org.springframework.security:spring-security-core", "--language", "java", "--package_manager", "Maven", "--root_data_dir=/data"]
+    command: ["python", "./runner.py", "--get_dependents", "--pattern", "password_based_authentication", "--web_framework", "fastapi", "--language", "python", "--package_manager", "Pypi", "--root_data_dir=/data"]
     deploy:
       resources:
         limits:

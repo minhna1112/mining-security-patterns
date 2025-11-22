@@ -12,6 +12,7 @@ from config.queries_loader import QueriesLoaderConfig
 from config.zoekt import ZoektConfig
 from context_retriever.queries_loader import QueriesLoader
 from context_retriever.zoekt_retriever import ZoektSearchRequester
+import yaml
 
 dependent_miners = {
     (PYTHON, PYPI): PythonDependentMiner,
@@ -45,6 +46,36 @@ class SecurityPatternMiner:
             raise ValueError(f"Unsupported language/package manager combination: {args.language}/{args.package_manager}")
         
         self.repo_crawler = GitCrawler(GitCrawlerConfig)
+
+    @staticmethod
+    def load_pattern_yaml(language: str, web_framework: str, pattern: str) -> dict:
+        """Load pattern YAML file and return its contents"""
+        yaml_path = os.path.join(
+            './context_retriever/queries_library',
+            language,
+            web_framework,
+            'patterns',
+            f'{pattern}.yaml'
+        )
+        
+        if not os.path.exists(yaml_path):
+            raise FileNotFoundError(f"Pattern YAML file not found: {yaml_path}")
+        
+        with open(yaml_path, 'r') as file:
+            return yaml.safe_load(file)
+    
+    @staticmethod
+    def extract_dependencies_from_pattern(language: str, web_framework: str, pattern: str) -> list[str]:
+        """Extract dependency package names from a pattern YAML file"""
+        pattern_data = SecurityPatternMiner.load_pattern_yaml(language, web_framework, pattern)
+        dependencies = pattern_data.get('dependencies', [])
+        
+        if not dependencies:
+            logger.warning(f"No dependencies found in pattern '{pattern}'")
+        else:
+            logger.info(f"Extracted {len(dependencies)} dependencies from pattern '{pattern}': {', '.join(dependencies)}")
+        
+        return dependencies
 
     def run(self, package_names: list[str]):
         if self.args.get_dependents:
@@ -185,7 +216,9 @@ def create_miner_parser():
     parser.add_argument("--get_dependents", action="store_true", help="Flag to get dependents for the specified package names (from scratch)")
     parser.add_argument("--language", type=str, default=PYTHON, help="Programming language")
     parser.add_argument("--package_manager", type=str, default=PYPI, help="Package manager")
-    parser.add_argument("--package_names", type=str, nargs='+', required=True, help="List of package names to find mutual dependents")
+    parser.add_argument("--package_names", type=str, nargs='+', help="List of package names to find mutual dependents")
+    parser.add_argument("--pattern", type=str, help="Security pattern name to extract dependencies from")
+    parser.add_argument("--web_framework", type=str, default="fastapi", help="Web framework for pattern-based mining")
     parser.add_argument("--max_pages", type=int, default=2000, help="Maximum number of pages to fetch from Libraries.io")
     parser.add_argument("--per_page", type=int, default=100, help="Number of results per page from Libraries.io")
     parser.add_argument("--start_page", type=int, default=1, help="Starting page number for fetching dependents")
@@ -225,8 +258,21 @@ if __name__ == "__main__":
         parser = create_miner_parser()
         args = parser.parse_args()
         
+        # Determine package names: either from args or from pattern
+        if args.pattern:
+            logger.info(f"Using pattern '{args.pattern}' to extract dependencies")
+            package_names = SecurityPatternMiner.extract_dependencies_from_pattern(
+                args.language, 
+                args.web_framework, 
+                args.pattern
+            )
+        elif args.package_names:
+            package_names = args.package_names
+        else:
+            parser.error("Either --package_names or --pattern must be specified")
+        
         miner = SecurityPatternMiner(args)
-        miner.run(args.package_names)
+        miner.run(package_names)
         
     elif "--construct_queries" in sys.argv:
         # Extracting mode
